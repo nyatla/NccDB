@@ -1,4 +1,4 @@
-package jp.nyatla.nccdb;
+package jp.nyatla.nccdb.table.internal;
 
 import jp.nyatla.nyansat.db.basic.table.internal.InternalNameTable;
 import jp.nyatla.nyansat.utils.SdbException;
