@@ -4,11 +4,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import jp.nyatla.nyansat.db.BasicTableDefinition;
-import jp.nyatla.nyansat.db.InsertSqlBuilder;
-import jp.nyatla.nyansat.db.PsUtils;
-import jp.nyatla.nyansat.db.RsUtils;
-import jp.nyatla.nyansat.db.SqliteDB;
+import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
+import jp.nyatla.nyansat.db.basic.InsertSqlBuilder;
+import jp.nyatla.nyansat.db.basic.PsUtils;
+import jp.nyatla.nyansat.db.basic.RsUtils;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.SdbException;
 
@@ -47,7 +47,7 @@ public class CoinSpecTable extends BaseTable
 					DN_total_coin+" real,"+
 					DN_premine+" real,"+
 					DN_id_algorism+" integer,"+
-					"primary key("+DN_id+"))";
+					"primary key("+DN_id+"),unique("+DN_total_coin+","+DN_premine+","+DN_id_algorism+"))";
 		}
 		@Override
 		public String[] getElementNames() {

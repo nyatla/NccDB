@@ -9,11 +9,12 @@ import jp.nyatla.nccdb.table.CoinInfoView.Item;
 import jp.nyatla.nccdb.table.CoinInfoView.RowIterable;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
-import jp.nyatla.nyansat.db.BasicTableDefinition;
-import jp.nyatla.nyansat.db.PsUtils;
-import jp.nyatla.nyansat.db.RsUtils;
-import jp.nyatla.nyansat.db.SqliteDB;
-import jp.nyatla.nyansat.db.UpdateSqlBuilder;
+import jp.nyatla.nyansat.db.basic.BaseRowIterable;
+import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
+import jp.nyatla.nyansat.db.basic.PsUtils;
+import jp.nyatla.nyansat.db.basic.RsUtils;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
+import jp.nyatla.nyansat.db.basic.UpdateSqlBuilder;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.CsvWriter;
 import jp.nyatla.nyansat.utils.SdbException;
@@ -32,9 +33,9 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public class CoinUrlTable extends BaseTable
+public class ServiceUrlTable extends BaseTable
 {
-	public final static String NAME="coin_url";
+	public final static String NAME="service_url";
 	public final static String DN_id="id";
 	public final static String DN_name="name";
 	public final static String DN_id_coin_url_type="id_coin_url_type";
@@ -75,6 +76,7 @@ public class CoinUrlTable extends BaseTable
 	public void dispose() throws SdbException
 	{
 		try {
+			this._ps_select.close();
 			this._ps_insert.close();
 			this._ps_select_all.close();
 			this._ps_update.close();
@@ -86,11 +88,12 @@ public class CoinUrlTable extends BaseTable
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select_all;
 	private PreparedStatement _ps_update;
-	public CoinUrlTable(SqliteDB i_db) throws SdbException
+	private PreparedStatement _ps_select;
+	public ServiceUrlTable(SqliteDB i_db) throws SdbException
 	{
 		this(i_db,NAME);
 	}
-	public CoinUrlTable(SqliteDB i_db,String i_table_name) throws SdbException
+	public ServiceUrlTable(SqliteDB i_db,String i_table_name) throws SdbException
 	{
 		super(i_db,new TableDef(i_table_name));
 		try {
@@ -98,12 +101,14 @@ public class CoinUrlTable extends BaseTable
 			this._ps_insert=this._db.getConnection().prepareStatement("insert or ignore into "+table_name+
 				"("+DN_name+","+DN_id_coin_url_type+","+DN_id_coin_url_status+","+DN_url+","+DN_description+") values(?,?,?,?,?);");
 			this._ps_select_all=this._db.getConnection().prepareStatement(
-					"select * from "+table_name +" ORDER BY "+DN_name+" ASC;");
+				String.format("select * from %s ORDER BY %s ASC;", table_name,DN_name));
+			this._ps_select=this._db.getConnection().prepareStatement(
+				String.format("select * from %s where %s=? and %s=?;",table_name,DN_name,DN_id_coin_url_type));
 			UpdateSqlBuilder usb=new UpdateSqlBuilder();
 			//nameをキーとしたupdateの生成
 			usb.init(table_name);
 			usb.add(new String[]{DN_name,DN_id_coin_url_type,DN_id_coin_url_status,DN_url,DN_description});
-			this._ps_update=this._db.getConnection().prepareStatement(usb.finish(DN_name+"=?"));
+			this._ps_update=this._db.getConnection().prepareStatement(usb.finish(DN_name+"=? and "+DN_id_coin_url_type+"=?"));
 		} catch (SQLException e){
 			throw new SdbException(e);
 		}
@@ -137,6 +142,7 @@ public class CoinUrlTable extends BaseTable
 			PsUtils.setNullableString(this._ps_update,4,i_url);
 			PsUtils.setNullableString(this._ps_update,5,i_description);
 			this._ps_update.setString(6,i_name);
+			this._ps_update.setInt(7,i_id_coin_url_type);
 			this._ps_update.execute();
 			boolean r=this._ps_update.getUpdateCount()>0;
 			if(!r){
@@ -187,50 +193,44 @@ public class CoinUrlTable extends BaseTable
 			throw new SdbException(e);
 		}
 	}
-	public class RowIterable implements Iterable<Item>,Iterator<Item>
+	public Item getItem(String i_service_name,int i_url_type) throws SdbException
 	{
-		private ResultSet _rs;
+		try{
+			ResultSet rs=null;
+			try{
+				this._ps_select.setString(1,i_service_name);
+				this._ps_select.setInt(2,i_url_type);
+				rs=this._ps_select.executeQuery();
+				if(rs.next()){
+					return new Item(rs);
+				}else{
+					return null;
+				}
+			}finally{
+				if(rs!=null){
+					rs.close();
+				}
+			}
+		}catch(SQLException e){
+			throw new SdbException(e);
+		}
+	}
+	
+	public final class RowIterable extends BaseRowIterable<Item>
+	{
 		public RowIterable(ResultSet i_rs)
 		{
-			this._rs=i_rs;
+			super(i_rs);
 		}
+
 		@Override
-		public Iterator<Item> iterator() {
-			// TODO Auto-generated method stub
-			return this;
-		}
-		@Override
-		public boolean hasNext()
+		protected Item createItem(ResultSet i_rs) throws SdbException
 		{
 			try {
-				return this._rs.next();
-			} catch (SQLException e) {
-				return false;
-			}
-		}
-		@Override
-		public Item next()
-		{
-			try {
-				return new Item(this._rs);
+				return new Item(i_rs);
 			} catch (SQLException e) {
 				return null;
-			} catch (SdbException e) {
-				return null;
 			}
-		}
-		@Override
-		public void remove()
-		{
-			throw new UnsupportedOperationException();
-		}
-		public void dispose()
-		{
-			try {
-				this._rs.close();
-			} catch (SQLException e){
-			}
-			this._rs=null;
 		}
 	}
 }

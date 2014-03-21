@@ -21,7 +21,13 @@ public class test {
 		String[] t6={
 				"-cmd","url_importcsv",
 		};
-		String[] test=t5;
+		String[] t7={
+				"-cmd","srv_importcsv",
+		};
+		String[] t8={
+				"-cmd","srv_exportcsv","-service","CoinEX:EXCHANGE,Coind Up:EXCHANGE,Coins-E:EXCHANGE,Crypt Rush:EXCHANGE,Cryptsy:EXCHANGE"
+		};
+		String[] test=t4;
 		Main.main(test);
 	}
 
@@ -30,7 +36,7 @@ public class test {
 	 *//*
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-		System.out.print((new Date(1394210528*1000L)).toString());
-	}
-*/
+		System.out.print((new Date(1394663640*1000L)).toString());
+	}*/
+
 }

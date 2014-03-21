@@ -4,12 +4,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import jp.nyatla.nyansat.db.BasicTableDefinition;
-import jp.nyatla.nyansat.db.InsertSqlBuilder;
-import jp.nyatla.nyansat.db.PsUtils;
-import jp.nyatla.nyansat.db.RsUtils;
-import jp.nyatla.nyansat.db.SqliteDB;
-import jp.nyatla.nyansat.db.UpdateSqlBuilder;
+import jp.nyatla.nyansat.db.basic.BaseRowIterable;
+import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
+import jp.nyatla.nyansat.db.basic.InsertSqlBuilder;
+import jp.nyatla.nyansat.db.basic.PsUtils;
+import jp.nyatla.nyansat.db.basic.RsUtils;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
+import jp.nyatla.nyansat.db.basic.UpdateSqlBuilder;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.SdbException;
 
@@ -90,6 +91,8 @@ public class CoinMasterTable extends BaseTable
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_update;
 	private PreparedStatement _ps_search_symbol;
+	private PreparedStatement _ps_select_all;
+	
 	public CoinMasterTable(SqliteDB i_db) throws SdbException
 	{
 		this(i_db,NAME);
@@ -101,6 +104,8 @@ public class CoinMasterTable extends BaseTable
 			String table_name=this._table_info.getTableName();
 			this._ps_search_symbol=this._db.getConnection().prepareStatement("select * from "+table_name +
 				" where "+DN_symbol+"=? and "+DN_name+"=?;");
+			this._ps_select_all=this._db.getConnection().prepareStatement(
+					"select * from "+table_name +" ORDER BY "+CoinMasterTable.DN_symbol+" ASC;");
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -357,5 +362,31 @@ public class CoinMasterTable extends BaseTable
 			throw new SdbException(e);
 		}
 	}
+
+	public RowIterable getAll() throws SdbException
+	{
+		try {
+			ResultSet rs=this._ps_select_all.executeQuery();
+			return new RowIterable(rs);
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
+	}
+	public final class RowIterable extends BaseRowIterable<Item>
+	{
+		public RowIterable(ResultSet i_rs)
+		{
+			super(i_rs);
+		}
+		@Override
+		protected Item createItem(ResultSet i_rs) throws SdbException
+		{
+			try {
+				return new Item(i_rs);
+			} catch (SQLException e) {
+				return null;
+			}
+		}
+	}	
 
 }

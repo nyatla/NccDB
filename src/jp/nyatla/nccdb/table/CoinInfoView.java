@@ -1,13 +1,16 @@
 package jp.nyatla.nccdb.table;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 
+import jp.nyatla.nccdb.table.ServiceUrlTable.Item;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
-import jp.nyatla.nyansat.db.BasicViewDefinition;
-import jp.nyatla.nyansat.db.RsUtils;
-import jp.nyatla.nyansat.db.SqliteDB;
+import jp.nyatla.nyansat.db.basic.BaseRowIterable;
+import jp.nyatla.nyansat.db.basic.BasicViewDefinition;
+import jp.nyatla.nyansat.db.basic.RsUtils;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.view.BaseView;
 import jp.nyatla.nyansat.utils.CsvWriter;
 import jp.nyatla.nyansat.utils.SdbException;
@@ -51,11 +54,18 @@ public class CoinInfoView extends BaseView
 			return this._cols;
 		}
 	}
+	private PreparedStatement _ps_select_all;
 	@Override
 	public void dispose() throws SdbException
 	{
+		try {
+			this._ps_select_all.close();
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
 		super.dispose();
 	}
+	
 	public CoinInfoView(SqliteDB i_db) throws SdbException
 	{
 		this(i_db,NAME);
@@ -65,7 +75,6 @@ public class CoinInfoView extends BaseView
 		super(i_db,new TableDef(i_table_name));
 		try {
 			String view_name=this._view_info.getTableName();
-			this._ps_select_all.close();
 			this._ps_select_all=this._db.getConnection().prepareStatement(
 				"select * from "+view_name +" ORDER BY "+CoinMasterTable.DN_symbol+" ASC;");
 		} catch (SQLException e){
@@ -81,51 +90,25 @@ public class CoinInfoView extends BaseView
 			throw new SdbException(e);
 		}
 	}
-	public class RowIterable implements Iterable<Item>,Iterator<Item>
+
+	public final class RowIterable extends BaseRowIterable<Item>
 	{
-		private ResultSet _rs;
 		public RowIterable(ResultSet i_rs)
 		{
-			this._rs=i_rs;
+			super(i_rs);
 		}
+
 		@Override
-		public Iterator<Item> iterator()
-		{
-			// TODO Auto-generated method stub
-			return this;
-		}
-		@Override
-		public boolean hasNext()
+		protected Item createItem(ResultSet i_rs) throws SdbException
 		{
 			try {
-				return this._rs.next();
-			} catch (SQLException e) {
-				return false;
-			}
-		}
-		@Override
-		public Item next()
-		{
-			try {
-				return new Item(this._rs);
+				return new Item(i_rs);
 			} catch (SQLException e) {
 				return null;
 			}
 		}
-		@Override
-		public void remove()
-		{
-			throw new UnsupportedOperationException();
-		}
-		public void dispose()
-		{
-			try {
-				this._rs.close();
-			} catch (SQLException e){
-			}
-			this._rs=null;
-		}
-	}
+	}	
+
 	public String[] getColHeader()
 	{
 		return new String[]{

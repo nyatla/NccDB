@@ -1,10 +1,11 @@
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 
 import jp.nyatla.nccdb.CryptCoinTankListScraper;
 import jp.nyatla.nccdb.table.*;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
-import jp.nyatla.nyansat.db.SqliteDB;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.CsvReader;
 import jp.nyatla.nyansat.utils.CsvWriter;
@@ -24,6 +25,13 @@ import jp.nyatla.nyansat.utils.SdbException;
  */
 public class CoinListCsvIo
 {
+	/**
+	 * CSVファイルの内容を重複無くテーブルに追加する。
+	 * CoinSpecTableには参照されなくなったデータが溜まるので別途クリーンアッププロセスが必要だけど当分大丈夫そうだから作ってない。
+	 * @param ap
+	 * @param i_db
+	 * @throws SdbException
+	 */
 	private static void importCSV(ArgHelper ap,SqliteDB i_db) throws SdbException
 	{
 		//CSVをインポート(値はCSVを優先)
@@ -32,6 +40,7 @@ public class CoinListCsvIo
 		String path=ap.getString("-csv", CSV_PATH);
 		CoinMasterTable coin_title=null;
 		CoinSpecTable coin_spec=null;
+		i_db.beginTransaction();
 		try {
 			coin_title=new CoinMasterTable(i_db);
 			coin_spec=new CoinSpecTable(i_db);
@@ -73,7 +82,7 @@ public class CoinListCsvIo
 				}else{
 					Logger.log("ALIAS=no,");
 					////実名の場合
-					if(st==null || !st.match(spec_total,spec_premine,spec_algorism)){
+					if(st==null){
 						////同一スペックが存在しない場合
 						if(!coin_spec.add(spec_total, spec_premine, spec_algorism)){
 							throw new SdbException();
@@ -84,6 +93,23 @@ public class CoinListCsvIo
 							throw new SdbException();
 						}
 						Logger.log("SPEC add="+st.id+",");
+					}else if(!st.match(spec_total,spec_premine,spec_algorism)){
+						////IDに記述されているスペックと異なる場合
+						st=coin_spec.getItem(spec_total, spec_premine, spec_algorism);
+						if(st==null){
+							////stを再検索して発見できなければ追加
+							if(!coin_spec.add(spec_total, spec_premine, spec_algorism)){
+								throw new SdbException();
+							}
+							//st再取得
+							st=coin_spec.getItem(spec_total, spec_premine, spec_algorism);
+							if(st==null){
+								throw new SdbException();
+							}
+							Logger.log("SPEC add="+st.id+",");
+						}else{
+							Logger.log("SPEC change="+st.id+",");
+						}
 					}else{
 						Logger.log("SPEC found="+st.id+",");
 					}
@@ -95,9 +121,11 @@ public class CoinListCsvIo
 				Logger.log("MASTER update");
 				Logger.log_end_line();
 			}
-		} catch (Throwable e){
-			throw new SdbException(e);
+			i_db.commit();
+		} catch (IOException e) {
+			throw new SdbException(e);			
 		}finally{
+			i_db.endTransaction();
 			if(coin_title!=null){
 				coin_title.dispose();
 			}
@@ -156,6 +184,7 @@ public class CoinListCsvIo
 			}
 		}
 		//tableオープン
+		i_db.beginTransaction();
 		try{
 			ctt=new CoinMasterTable(i_db);
 			cst=new CoinSpecTable(i_db);
@@ -182,7 +211,9 @@ public class CoinListCsvIo
 					Logger.log("["+(is_cct?"ADD":"DROP")+"]"+i.symbol+":"+i.name);
 				}
 			}
+			i_db.commit();			
 		}finally{
+			i_db.endTransaction();			
 			if(ctt!=null){
 				ctt.dispose();
 			}
@@ -199,13 +230,13 @@ public class CoinListCsvIo
 		CoinMasterTable ctt=null;
 		CoinSpecTable cst=null;
 		CoinInfoView civ=null;
-		CoinUrlTable cut=null;
+		ServiceUrlTable cut=null;
 		//tableオープン
 		try{
 			ctt=new CoinMasterTable(i_db);
 			cst=new CoinSpecTable(i_db);
 			civ=new CoinInfoView(i_db);
-			cut=new CoinUrlTable(i_db);
+			cut=new ServiceUrlTable(i_db);
 		}finally{
 			if(ctt!=null){
 				ctt.dispose();
@@ -235,7 +266,19 @@ public class CoinListCsvIo
 	};
 	public static final String CSV_PATH="coinspec.csv";
 	
-
+	public static String readme()
+	{
+		return
+			CoinListCsvIo.class.getName()+"\n"+
+			"-cmd coin_importcsv [-db DB] [-csv CSV]\n"+
+			"-cmd coin_exportcsv [-db DB] [-csv CSV]\n"+
+			"-cmd coin_addlist [-db DB] [-u UA] [-url URL] [-cookie COOKIE]\n"+
+			"	DB - sqlite3 file name. default="+Main.ENV_DB_PATH+"\n"+
+			"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH+"\n"+
+			"	UA - User agent parametor for http get.\n"+
+			"	URL - CSV style URL list of cryptocointalk.com thread. default=set of cryptocointalk.com thread.\n"+
+			"	COOKIE - Cookie parametor for http get.";
+	}
 	public static boolean run(String i_cmd,ArgHelper args,SqliteDB db) throws SdbException
 	{
 		if(i_cmd.compareTo("init")==0){

@@ -2,7 +2,7 @@ import java.io.IOException;
 
 import jp.nyatla.nccdb.table.*;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
-import jp.nyatla.nyansat.db.SqliteDB;
+import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.CsvReader;
 import jp.nyatla.nyansat.utils.CsvWriter;
@@ -12,7 +12,7 @@ import jp.nyatla.nyansat.utils.SdbException;
 
 /**
  * URLリストCSVのIOコマンドの実装。
- * UrlListCsvは{@link CoinUrlTable}のダンプファイルです。
+ * UrlListCsvは{@link ServiceUrlTable}のダンプファイルです。
  * URLとそのサービスカテゴリの一覧を記述します。
  * <pre>
  * 形式
@@ -28,17 +28,18 @@ public class UrlListCsvIo
 		Logger.log("Start importCSV");
 		//ファイル
 		String path=ap.getString("-csv", CSV_PATH);
-		CoinUrlTable coin_url=null;
+		ServiceUrlTable coin_url=null;
+		i_db.beginTransaction();
 		try {
-			coin_url=new CoinUrlTable(i_db);
+			coin_url=new ServiceUrlTable(i_db);
 			//ファイル読み込み
 			CsvReader csv=new CsvReader(path);
 			//列インデックスを得る。	
-			int name_idx		=csv.getIndex(CoinUrlTable.DN_name);
-			int url_type_idx	=csv.getIndex(CoinUrlTable.DN_id_coin_url_type);
-			int url_status_idx	=csv.getIndex(CoinUrlTable.DN_id_coin_url_status);
-			int url_idx			=csv.getIndex(CoinUrlTable.DN_url);
-			int description_idx	=csv.getIndex(CoinUrlTable.DN_description);
+			int name_idx		=csv.getIndex(ServiceUrlTable.DN_name);
+			int url_type_idx	=csv.getIndex(ServiceUrlTable.DN_id_coin_url_type);
+			int url_status_idx	=csv.getIndex(ServiceUrlTable.DN_id_coin_url_status);
+			int url_idx			=csv.getIndex(ServiceUrlTable.DN_url);
+			int description_idx	=csv.getIndex(ServiceUrlTable.DN_description);
 			while(csv.next()){
 				String name=csv.getString(name_idx);
 				int type_idx=ServiceTypeTable.getSingleton().getId(csv.getString(url_type_idx));
@@ -51,9 +52,11 @@ public class UrlListCsvIo
 					throw new SdbException();
 				}
 			}
+			i_db.commit();
 		} catch (Throwable e){
 			throw new SdbException(e);
 		}finally{
+			i_db.endTransaction();
 			if(coin_url!=null){
 				coin_url.dispose();
 			}
@@ -66,15 +69,15 @@ public class UrlListCsvIo
 		//ファイル
 		String path=ap.getString("-csv", CSV_PATH);
 		//CSVをエクスポート
-		CoinUrlTable civ=null;
+		ServiceUrlTable civ=null;
 		try{
 			CsvWriter writer=new CsvWriter(path);
-			civ=new CoinUrlTable(i_db);
+			civ=new ServiceUrlTable(i_db);
 			writer.writeCol(civ.getColHeader());
 			writer.next();
-			CoinUrlTable.RowIterable it=civ.getAll();
+			ServiceUrlTable.RowIterable it=civ.getAll();
 			int p=1;
-			for(CoinUrlTable.Item i :it){
+			for(ServiceUrlTable.Item i :it){
 				Logger.log(p+":"+i.name);
 				writer.writeCol(i.toCsvArrray());
 				writer.next();
@@ -100,5 +103,13 @@ public class UrlListCsvIo
 			return false;
 		}
 		return true;
+	}
+	public static String readme()
+	{
+		return UrlListCsvIo.class.getName()+"\n"+
+		"-cmd url_importcsv [-db DB] [-csv CSV]\n"+
+		"-cmd url_exportcsv [-db DB] [-csv CSV]\n"+
+		"	DB - sqlite3 file name. default="+Main.ENV_DB_PATH+"\n"+
+		"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH;
 	}
 }
