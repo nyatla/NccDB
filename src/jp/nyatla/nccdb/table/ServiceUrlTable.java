@@ -130,6 +130,16 @@ public class ServiceUrlTable extends BaseTable
 			throw new SdbException(e);
 		}
 	}
+	/**
+	 * データを更新する。該当データが存在しない場合は{@link #add}を実行する。
+	 * @param i_name
+	 * @param i_id_coin_url_type
+	 * @param id_coin_url_status
+	 * @param i_url
+	 * @param i_description
+	 * @return
+	 * @throws SdbException
+	 */
 	public boolean update(String i_name,int i_id_coin_url_type,int id_coin_url_status,String i_url,String i_description) throws SdbException
 	{
 		try {

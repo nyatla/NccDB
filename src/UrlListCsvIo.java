@@ -93,12 +93,12 @@ public class UrlListCsvIo
 	}
 	public static final String CSV_PATH="coinurl.csv";	
 
-	public static boolean run(String i_cmd,ArgHelper args,SqliteDB db) throws SdbException
+	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
-		if(i_cmd.compareTo("url_importcsv")==0){
-			importCSV(args,db);
+		if(i_cmd.compareTo("url_importcsv")==0){		
+			importCSV(args,args.getNccDB());
 		}else if(i_cmd.compareTo("url_exportcsv")==0){
-			exportCSV(args,db);
+			exportCSV(args,args.getNccDB());
 		}else{
 			return false;
 		}
@@ -109,7 +109,7 @@ public class UrlListCsvIo
 		return UrlListCsvIo.class.getName()+"\n"+
 		"-cmd url_importcsv [-db DB] [-csv CSV]\n"+
 		"-cmd url_exportcsv [-db DB] [-csv CSV]\n"+
-		"	DB - sqlite3 file name. default="+Main.ENV_DB_PATH+"\n"+
+		"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
 		"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH;
 	}
 }

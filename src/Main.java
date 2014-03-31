@@ -7,26 +7,19 @@ import jp.nyatla.nyansat.utils.SdbException;
 
 public class Main
 {
-	public static final String VERSION="1.2.2";
-	public static final String ENV_DB_PATH="NccDB.sqlite3";
-	
+	public static final String VERSION="1.2.2";	
 	public static void main(String[] args)
 	{
 		try{
-			ArgHelper a=new ArgHelper(args);			
+			NccDBAppArgHelper a=new NccDBAppArgHelper(args);			
 			String c=a.getString("-cmd",null);
 			if(c==null){
 				throw new SdbException("-cmd not found");
 			}
-			String db_path=a.getString("-db",ENV_DB_PATH);
-			if(db_path==null){
-				throw new SdbException();
-			}
-			SqliteDB db=new SqliteDB(db_path);
-			
-			if(CoinListCsvIo.run(c,a,db)){
-			}else if(UrlListCsvIo.run(c,a,db)){
-			}else if(ServiceCoinCsvIo.run(c,a,db)){
+			if(CoinListCsvIo.run(c,a)){
+			}else if(UrlListCsvIo.run(c,a)){
+			}else if(ServiceCoinCsvIo.run(c,a)){
+			}else if(CctHtmlCache.run(c, a)){
 			}else{
 				throw new Exception("Bad -cmd");
 			}

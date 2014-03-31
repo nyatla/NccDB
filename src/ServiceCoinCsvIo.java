@@ -187,16 +187,16 @@ public class ServiceCoinCsvIo
 		return ServiceCoinCsvIo.class.getName()+"\n"+
 		"-cmd srv_importcsv [-db DB] [-csv CSV]\n"+
 		"-cmd srv_exportcsv [-db DB] -service SERVICELIST [-csv CSV]\n"+
-		"	DB - sqlite3 file name. default="+Main.ENV_DB_PATH+"\n"+
+		"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
 		"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH+"\n"+
 		"	SERVICELIST - CSV style service name list";
 	}
-	public static boolean run(String i_cmd,ArgHelper args,SqliteDB db) throws SdbException
+	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
 		if(i_cmd.compareTo("srv_importcsv")==0){
-			importCSV(args,db);
+			importCSV(args,args.getNccDB());
 		}else if(i_cmd.compareTo("srv_exportcsv")==0){
-			exportCSV(args,db);
+			exportCSV(args,args.getNccDB());
 		}else{
 			return false;
 		}

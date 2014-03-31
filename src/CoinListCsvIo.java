@@ -176,7 +176,7 @@ public class CoinListCsvIo
 		CoinMasterTable ctt=null;
 		CoinSpecTable cst=null;
 		//URLリストの構築
-		String[] url_list=cc_url_list;
+		String[] url_list=CC_URL_LIST;
 		{
 			String l=ap.getString("url", null);
 			if(l!=null){
@@ -254,7 +254,7 @@ public class CoinListCsvIo
 		Logger.log("done.");
 	}
 	
-	public static String[] cc_url_list={
+	public static String[] CC_URL_LIST={
 		"https://cryptocointalk.com/forum/557-unlaunched-cryptocoins/",
 		"https://cryptocointalk.com/forum/40-new-cryptocoins/",
 		"https://cryptocointalk.com/forum/178-scrypt-cryptocoins/",
@@ -273,22 +273,22 @@ public class CoinListCsvIo
 			"-cmd coin_importcsv [-db DB] [-csv CSV]\n"+
 			"-cmd coin_exportcsv [-db DB] [-csv CSV]\n"+
 			"-cmd coin_addlist [-db DB] [-u UA] [-url URL] [-cookie COOKIE]\n"+
-			"	DB - sqlite3 file name. default="+Main.ENV_DB_PATH+"\n"+
+			"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
 			"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH+"\n"+
 			"	UA - User agent parametor for http get.\n"+
 			"	URL - CSV style URL list of cryptocointalk.com thread. default=set of cryptocointalk.com thread.\n"+
 			"	COOKIE - Cookie parametor for http get.";
 	}
-	public static boolean run(String i_cmd,ArgHelper args,SqliteDB db) throws SdbException
+	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
 		if(i_cmd.compareTo("init")==0){
-			initDB(args,db);
+			initDB(args,args.getNccDB());
 		}else if(i_cmd.compareTo("coin_addlist")==0){
-			syncryptCoinList(args,db);
+			syncryptCoinList(args,args.getNccDB());
 		}else if(i_cmd.compareTo("coin_exportcsv")==0){
-			exportCSV(args,db);
+			exportCSV(args,args.getNccDB());
 		}else if(i_cmd.compareTo("coin_importcsv")==0){
-			importCSV(args,db);
+			importCSV(args,args.getNccDB());
 		}else{
 			return false;
 		}
