@@ -60,7 +60,7 @@ public class ServiceUrlTable extends BaseTable
 				DN_url+" text,"+
 				DN_description+" text,"+
 				"primary key("+DN_id+"),"+
-				"unique("+DN_name+","+DN_id_coin_url_type+"))";
+				"unique("+DN_url+","+DN_id_coin_url_type+"))";
 		}
 		@Override
 		public String[] getElementNames() {
@@ -76,7 +76,8 @@ public class ServiceUrlTable extends BaseTable
 	public void dispose() throws SdbException
 	{
 		try {
-			this._ps_select.close();
+			this._ps_select_by_name_type.close();
+			this._ps_select_by_url_type.close();
 			this._ps_insert.close();
 			this._ps_select_all.close();
 			this._ps_update.close();
@@ -88,7 +89,8 @@ public class ServiceUrlTable extends BaseTable
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select_all;
 	private PreparedStatement _ps_update;
-	private PreparedStatement _ps_select;
+	private PreparedStatement _ps_select_by_name_type;
+	private PreparedStatement _ps_select_by_url_type;
 	public ServiceUrlTable(SqliteDB i_db) throws SdbException
 	{
 		this(i_db,NAME);
@@ -102,13 +104,15 @@ public class ServiceUrlTable extends BaseTable
 				"("+DN_name+","+DN_id_coin_url_type+","+DN_id_coin_url_status+","+DN_url+","+DN_description+") values(?,?,?,?,?);");
 			this._ps_select_all=this._db.getConnection().prepareStatement(
 				String.format("select * from %s ORDER BY %s ASC;", table_name,DN_name));
-			this._ps_select=this._db.getConnection().prepareStatement(
+			this._ps_select_by_name_type=this._db.getConnection().prepareStatement(
 				String.format("select * from %s where %s=? and %s=?;",table_name,DN_name,DN_id_coin_url_type));
+			this._ps_select_by_url_type=this._db.getConnection().prepareStatement(
+				String.format("select * from %s where %s=? and %s=?;",table_name,DN_url,DN_id_coin_url_type));
 			UpdateSqlBuilder usb=new UpdateSqlBuilder();
 			//nameをキーとしたupdateの生成
 			usb.init(table_name);
 			usb.add(new String[]{DN_name,DN_id_coin_url_type,DN_id_coin_url_status,DN_url,DN_description});
-			this._ps_update=this._db.getConnection().prepareStatement(usb.finish(DN_name+"=? and "+DN_id_coin_url_type+"=?"));
+			this._ps_update=this._db.getConnection().prepareStatement(usb.finish(DN_url+"=? and "+DN_id_coin_url_type+"=?"));
 		} catch (SQLException e){
 			throw new SdbException(e);
 		}
@@ -116,13 +120,13 @@ public class ServiceUrlTable extends BaseTable
 	protected boolean add(String i_name,int i_id_coin_url_type,int id_coin_url_status,String i_url,String i_description) throws SdbException
 	{
 		try {
-			if(i_name==null){
+			if(i_url==null){
 				throw new SdbException();
 			}
-			this._ps_insert.setString(1,i_name);
+			PsUtils.setNullableString(this._ps_insert,1,i_name);
 			this._ps_insert.setInt(2,i_id_coin_url_type);
 			this._ps_insert.setInt(3,id_coin_url_status);
-			PsUtils.setNullableString(this._ps_insert,4,i_url);
+			this._ps_insert.setString(4,i_url);
 			PsUtils.setNullableString(this._ps_insert,5,i_description);
 			this._ps_insert.execute();
 			return this._ps_insert.getUpdateCount()>0;
@@ -131,7 +135,8 @@ public class ServiceUrlTable extends BaseTable
 		}
 	}
 	/**
-	 * データを更新する。該当データが存在しない場合は{@link #add}を実行する。
+	 * データを更新する。検索キーはi_id_coin_url_typeとi_url.
+	 * 該当データが存在しない場合は{@link #add}を実行する。
 	 * @param i_name
 	 * @param i_id_coin_url_type
 	 * @param id_coin_url_status
@@ -143,15 +148,15 @@ public class ServiceUrlTable extends BaseTable
 	public boolean update(String i_name,int i_id_coin_url_type,int id_coin_url_status,String i_url,String i_description) throws SdbException
 	{
 		try {
-			if(i_name==null){
+			if(i_url==null){
 				throw new SdbException();
 			}
-			this._ps_update.setString(1,i_name);
+			PsUtils.setNullableString(this._ps_update,1,i_name);
 			this._ps_update.setInt(2,i_id_coin_url_type);
 			this._ps_update.setInt(3,id_coin_url_status);
-			PsUtils.setNullableString(this._ps_update,4,i_url);
+			this._ps_update.setString(4,i_url);
 			PsUtils.setNullableString(this._ps_update,5,i_description);
-			this._ps_update.setString(6,i_name);
+			this._ps_update.setString(6,i_url);
 			this._ps_update.setInt(7,i_id_coin_url_type);
 			this._ps_update.execute();
 			boolean r=this._ps_update.getUpdateCount()>0;
@@ -202,15 +207,15 @@ public class ServiceUrlTable extends BaseTable
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
-	}
-	public Item getItem(String i_service_name,int i_url_type) throws SdbException
+	}/*
+	public Item getItemByNameType(String i_service_name,int i_url_type) throws SdbException
 	{
 		try{
 			ResultSet rs=null;
 			try{
-				this._ps_select.setString(1,i_service_name);
-				this._ps_select.setInt(2,i_url_type);
-				rs=this._ps_select.executeQuery();
+				this._ps_select_by_name_type.setString(1,i_service_name);
+				this._ps_select_by_name_type.setInt(2,i_url_type);
+				rs=this._ps_select_by_name_type.executeQuery();
 				if(rs.next()){
 					return new Item(rs);
 				}else{
@@ -224,8 +229,29 @@ public class ServiceUrlTable extends BaseTable
 		}catch(SQLException e){
 			throw new SdbException(e);
 		}
-	}
-	
+	}*/
+	public Item getItemByUrlType(String i_url,int i_url_type) throws SdbException
+	{
+		try{
+			ResultSet rs=null;
+			try{
+				this._ps_select_by_url_type.setString(1,i_url);
+				this._ps_select_by_url_type.setInt(2,i_url_type);
+				rs=this._ps_select_by_url_type.executeQuery();
+				if(rs.next()){
+					return new Item(rs);
+				}else{
+					return null;
+				}
+			}finally{
+				if(rs!=null){
+					rs.close();
+				}
+			}
+		}catch(SQLException e){
+			throw new SdbException(e);
+		}
+	}	
 	public final class RowIterable extends BaseRowIterable<Item>
 	{
 		public RowIterable(ResultSet i_rs)

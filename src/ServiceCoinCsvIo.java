@@ -4,6 +4,7 @@ import jp.nyatla.nccdb.table.CoinMasterTable;
 import jp.nyatla.nccdb.table.CoinUrlIdPairTable;
 import jp.nyatla.nccdb.table.ServiceUrlTable;
 import jp.nyatla.nccdb.table.IdPairTable;
+import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
@@ -23,7 +24,7 @@ import jp.nyatla.nyansat.utils.SdbException;
  * [id:optional],[coin_symbol],[coin_name],[serveic_name(1)],[service_name(2)]...
  * 
  * </pre>
- * 
+ * serveic_nameは、"URLTYPE@URL"形式でURLには@を含むことができます。
  */
 public class ServiceCoinCsvIo
 {
@@ -43,21 +44,37 @@ public class ServiceCoinCsvIo
 			coin_master=new CoinMasterTable(i_db);
 			//ファイル読み込み
 			CsvReader csv=new CsvReader(path);
-			//列インデックスを得る。	
+			//1行目のインデックスを得る。	
 			int coin_symbol_idx	=csv.getIndex(CoinMasterTable.DN_symbol);
 			int coin_name_idx	=csv.getIndex(CoinMasterTable.DN_name);
 			//サービス名インデクス、その個数を得る
 			int service_name_idx=coin_name_idx+1;
-			int number_of_service=csv.getCols()-(service_name_idx+1);
+			int number_of_service=csv.getCols()-service_name_idx;
+			//2行目のインデクスを得る。
+			//3行目のインデクスを得る。
 			//サービスIDを検索
 			ServiceUrlTable.Item[] url_item=new ServiceUrlTable.Item[number_of_service];
 			{
+				String[] url=new String[number_of_service];
+				int[] url_type=new int[number_of_service];
+				//1行目は読み飛ばし
 				for(int i=0;i<number_of_service;i++){
-					String[] s=csv.getIndexStr(service_name_idx+i).split(":");
-					if(s.length!=2){
-						throw new SdbException();
-					}
-					url_item[i]=coin_url.getItem(s[0],ServiceTypeTable.getSingleton().getId(s[1]));
+					
+				}
+				csv.next();
+				//2行目(TYPE)
+				for(int i=0;i<number_of_service;i++){
+					url_type[i]=ServiceTypeTable.getSingleton().getId(csv.getString(service_name_idx+i));
+				}
+				csv.next();
+				//3行目
+				for(int i=0;i<number_of_service;i++){
+					url[i]=csv.getString(service_name_idx+i);
+				}
+				
+				//URLテーブルからURL/TYPEキーでデータを取得
+				for(int i=0;i<number_of_service;i++){
+					url_item[i]=coin_url.getItemByUrlType(url[i],url_type[i]);
 					if(url_item[i]==null){
 						throw new SdbException();
 					}
@@ -130,22 +147,42 @@ public class ServiceCoinCsvIo
 
 			writer.writeCol(CoinMasterTable.DN_symbol);
 			writer.writeCol(CoinMasterTable.DN_name);
-			//サービスのURLIDを検索
 			ServiceUrlTable.Item[] url_item=new ServiceUrlTable.Item[service_names.length];
+			//列行の書き出し
 			{
+				//情報取得と1行目の書き出し
 				for(int i=0;i<service_names.length;i++){
-					String[] s=service_names[i].split(":");
-					if(s.length!=2){
+					//SERVICE@URL形式
+					int sp=service_names[i].indexOf('@');
+					if(sp<0){
 						throw new SdbException();
 					}
-					url_item[i]=coin_url.getItem(s[0],ServiceTypeTable.getSingleton().getId(s[1]));
+					
+					//サービス情報を得る。
+					url_item[i]=coin_url.getItemByUrlType(
+							service_names[i].substring(sp+1),
+							ServiceTypeTable.getSingleton().getId(service_names[i].substring(0,sp)));
 					if(url_item[i]==null){
 						throw new SdbException();
 					}
-					writer.writeCol(url_item[i].name+":"+ServiceTypeTable.getSingleton().getString(url_item[i].id_coin_url_type));
+					writer.writeCol(url_item[i].name);
+				}
+				writer.next();
+				//2行目
+				writer.writeCol("");
+				writer.writeCol("");
+				for(int i=0;i<service_names.length;i++){
+					writer.writeCol(ServiceTypeTable.getSingleton().getString(url_item[i].id_coin_url_type));
+				}
+				writer.next();
+				//3行目
+				writer.writeCol("");
+				writer.writeCol("");
+				for(int i=0;i<service_names.length;i++){
+					writer.writeCol(url_item[i].url);
 				}
 			}
-			writer.next();			
+			writer.next();
 			String[] row=new String[service_names.length+2];
 			CoinMasterTable.RowIterable it=coin_master.getAll();
 			for(CoinMasterTable.Item ci:it)

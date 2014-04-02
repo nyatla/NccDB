@@ -12,7 +12,7 @@ public class NccDBAppArgHelper extends ArgHelper
 	}
 	public SqliteDB getHtmlCache() throws SdbException
 	{
-		String db_path=this.getString("-db",ENV_HTML_CACHE_DB_PATH);
+		String db_path=this.getString("-cct_db",ENV_HTML_CACHE_DB_PATH);
 		if(db_path==null){
 			throw new SdbException();
 		}

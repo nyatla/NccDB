@@ -8,6 +8,9 @@ public class Logger
 	}
 	public static void log_end_line()
 	{
+		if(_log_text==null){
+			return;
+		}
 		System.out.println(_log_text);
 		_log_text=null;
 	}

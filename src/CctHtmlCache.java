@@ -13,8 +13,12 @@ import jp.nyatla.nccdb.CryptCoinTankListScraper;
 import jp.nyatla.nccdb.CryptCoinTankListScraper.Item;
 import jp.nyatla.nccdb.table.CoinMasterTable;
 import jp.nyatla.nccdb.table.CoinSpecTable;
+import jp.nyatla.nccdb.table.CoinUrlIdPairTable;
 import jp.nyatla.nccdb.table.HtmlCacheTable;
+import jp.nyatla.nccdb.table.IdPairTable;
+import jp.nyatla.nccdb.table.ServiceUrlTable;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
+import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.BasicHttpClient;
@@ -109,7 +113,11 @@ public class CctHtmlCache
 		Logger.log("done.");
 	}
 	/**
-	 * タグツリーからStrong値とURLペアを格納するArrayList
+	 * タグツリーからStrong値とURL解析結果を格納するArrayList。
+	 * 各行の内容は以下の通り
+	 * s[0]:正規化カテゴリ
+	 * s[1]:生カテゴリ
+	 * s[2]:正規化URL
 	 * 
 	 */
 	@SuppressWarnings("serial")
@@ -143,13 +151,16 @@ public class CctHtmlCache
 		private static final String DICTIONARY_FILE="./url_normalize.dat";
 		private String _current_strong;
 		private RegExpKeyTable _regexp_table;
-		private CctThreadLinkList(Document i_doc)
+
+		private CctThreadLinkList(Document i_doc) throws SdbException
 		{
 			super();
 			try {
 				this._regexp_table=new RegExpKeyTable(DICTIONARY_FILE);
 			} catch (FileNotFoundException e){
+				throw new SdbException(e);
 			} catch (IOException e) {
+				throw new SdbException(e);
 			}
 			this._current_strong="";
 			this.parseNode(this.searchContentTag(i_doc.getElementById("ips_Posts")));
@@ -162,9 +173,15 @@ public class CctHtmlCache
 			}else if(i_node.tagName().compareToIgnoreCase("a")==0){
 				//URL抽出
 				String href=i_node.attr("href");
-				//URL検索キーで調査
+				if(href==null){
+					//hrefアトリビュートなし
+					return;
+				}
+				if(!href.matches("((https?)|(ftp))://.*")){
+					return;
+				}
 				String[] param=this._regexp_table.search(href);
-				
+				//URL検索キーで調査
 				//正規かフラグの取得
 				boolean is_url_normalize=false;
 				boolean is_type_normalize=false;
@@ -176,7 +193,7 @@ public class CctHtmlCache
 				this.add(new String[]{
 					is_type_normalize?param[1]:normalizeKeyName(this._current_strong),
 					this._current_strong,
-					is_url_normalize?param[3]:i_node.attr("href")});
+					is_url_normalize?param[3]:href});
 			}else{
 				//階層探査
 				Elements els=i_node.children();
@@ -247,10 +264,14 @@ public class CctHtmlCache
 		CoinMasterTable ctt=null;
 		//tableオープン
 		SqliteDB cache_db=ap.getHtmlCache();
+		SqliteDB db=ap.getNccDB();
 		HtmlCacheTable hct=new HtmlCacheTable(cache_db,HtmlCacheTable.NAME);
 		HtmlCacheTable.RowIterable rows=hct.getAll();
-		CoinMasterTable coin_master=new CoinMasterTable(cache_db);
+		CoinMasterTable coin_master=new CoinMasterTable(db);
+		ServiceUrlTable service_url=new ServiceUrlTable(db);
+		CoinUrlIdPairTable id_pair=new CoinUrlIdPairTable(db);
 		try{
+			db.beginTransaction();
 			//全行取得
 			for(HtmlCacheTable.Item row : rows){
 				//HTMLを解析してURLリストを生成
@@ -258,20 +279,39 @@ public class CctHtmlCache
 				//コインシンボル、コイン名を取得
 				String[] k=row.key.split(":");
 
-				//コインデータベースへインポート
-
 				//コインを選択
-				coin_master.getItem(k[0],k[1]);
+				CoinMasterTable.Item coin=coin_master.getItem(k[0],k[1]);
+				if(coin==null){
+					//コイン見つからない。
+					Logger.log(String.format("[ERROR]%s:%s:coin not found",k[0],k[1]));
+					continue;
+				}
 				for(String[] s:pbl){
+					String url=s[2];
+					int url_type=ServiceTypeTable.getSingleton().getId(s[0]);
+					//URLをキーに選択してnameを取得
+					ServiceUrlTable.Item url_item=service_url.getItemByUrlType(url,url_type);
 					//URLをignore existで追加
-					//URLを選択
-					
-					//コインペアをignore existで追加
-					Logger.log(
-						String.format("%s,%s,%s,%s,%s",k[0],k[1],s[0],s[1].replaceAll(","," "),s[2]));
-				}				
+					boolean is_add_url=service_url.update(
+						url_item==null?s[1]:url_item.name,	//name
+						url_type,	//id_type
+						0,		//status
+						s[2],	//url
+						null);	//description
+					//URLを選択しなおす。
+					ServiceUrlTable.Item selected_url=service_url.getItemByUrlType(s[2],url_type);
+					if(selected_url==null){
+						throw new SdbException();
+					}
+					//コインID/URLを追加
+					boolean is_add_id_pair=id_pair.add(coin.id,selected_url.id);
+					//ログ
+					Logger.log(String.format("[OK]%s:%s:url=%s,id_pair=%s",k[0],k[1],is_add_url?"update":"error",is_add_id_pair?"add":"exist"));
+				}
 			}
+			db.commit();			
 		}finally{
+			db.endTransaction();			
 			if(ctt!=null){
 				ctt.dispose();
 			}
@@ -281,7 +321,18 @@ public class CctHtmlCache
 		}
 		Logger.log("done.");
 	}
-	
+	public static String readme()
+	{
+		return
+			CoinListCsvIo.class.getName()+"\n"+
+			"-cmd cct_html_cache [-cct_db CCTDB] [-u UA] [-url URL] [-cookie COOKIE]\n"+
+			"-cmd cct_import_urls [-cct_db DB] [-csv CSV]\n"+
+			"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
+			"	CCTDB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_HTML_CACHE_DB_PATH+"\n"+
+			"	UA - User agent parametor for http get.\n"+
+			"	URL - CSV style URL list of cryptocointalk.com thread. default=set of cryptocointalk.com thread.\n"+
+			"	COOKIE - Cookie parametor for http get.";
+	}	
 	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
 		if(i_cmd.compareTo("cct_html_cache")==0){
@@ -289,7 +340,7 @@ public class CctHtmlCache
 			getInformationCoinThread(args,args.getHtmlCache());
 		}else if(i_cmd.compareTo("cct_import_urls")==0){
 			//HTMLからコインペアへ
-			extractCoinUrl(args,args.getHtmlCache());
+			extractCoinUrl(args);
 		}else{
 			return false;
 		}

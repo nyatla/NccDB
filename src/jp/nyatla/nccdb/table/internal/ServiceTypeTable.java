@@ -24,7 +24,7 @@ public final class ServiceTypeTable extends InternalNameTable
 		"POOL",
 		"EXCHANGE",
 		"SNS",
-		"FAUCETS",
+		"FAUCET",
 		"FORUM",
 		"GAME",
 		"CLIENT",

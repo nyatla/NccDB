@@ -7,7 +7,7 @@ import jp.nyatla.nyansat.utils.SdbException;
 
 public class Main
 {
-	public static final String VERSION="1.2.2";	
+	public static final String VERSION="1.3.0";	
 	public static void main(String[] args)
 	{
 		try{
@@ -28,7 +28,7 @@ public class Main
 			System.out.println(CoinListCsvIo.readme());
 			System.out.println(UrlListCsvIo.readme());
 			System.out.println(ServiceCoinCsvIo.readme());
-			System.out.println();
+			System.out.println(CctHtmlCache.readme());
 			e.printStackTrace();
 		}
 	}
