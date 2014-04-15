@@ -178,7 +178,7 @@ public class CoinListCsvIo
 		//URLリストの構築
 		String[] url_list=CC_URL_LIST;
 		{
-			String l=ap.getString("url", null);
+			String l=ap.getString("-url", null);
 			if(l!=null){
 				url_list=l.split(",");
 			}
