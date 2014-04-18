@@ -4,9 +4,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import jp.nyatla.nccdb.table.CoinMasterTable.Item;
-import jp.nyatla.nccdb.table.CoinMasterTable.RowIterable;
-import jp.nyatla.nyansat.db.basic.BaseRowIterable;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
@@ -22,11 +19,11 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public class HtmlCacheTable extends BaseTable
+public class HtmlCacheTable extends BaseTable<HtmlCacheTable.Item>
 {
 	public final static String NAME="cct_cache";
 
-	private static class HtmlCacheTableInfo extends BasicTableDefinition
+	private static class HtmlCacheTableInfo extends BasicTableDefinition<Item>
 	{
 		private final static String id_date="date";
 		private final static String id_key="key";
@@ -47,6 +44,10 @@ public class HtmlCacheTable extends BaseTable
 				id_html+" text,"+
 				"unique("+id_key+"))";
 		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
+		}
 	}
 	@Override
 	public void dispose() throws SdbException
@@ -54,16 +55,13 @@ public class HtmlCacheTable extends BaseTable
 		try {
 			this._ps_insert.close();
 			this._ps_select_by_key.close();
-			this._ps_select_all.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
 	}
 
-//	private PreparedStatement _ps_delete;
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select_by_key;
-	private PreparedStatement _ps_select_all;
 	public HtmlCacheTable(SqliteDB i_db,String i_table_name) throws SdbException
 	{
 		super(i_db,new HtmlCacheTableInfo(i_table_name));
@@ -77,9 +75,6 @@ public class HtmlCacheTable extends BaseTable
 			this._ps_select_by_key=this._db.getConnection().prepareStatement(
 				String.format("select * from %s where %s=?;",
 				table_name,d[1]));
-			this._ps_select_all=this._db.getConnection().prepareStatement(
-				String.format("select * from %s;",
-				table_name));
 		}catch (SQLException e){
 			throw new SdbException(e);
 		}
@@ -144,17 +139,21 @@ public class HtmlCacheTable extends BaseTable
 	}*/
 	public static class Item
 	{
-		public Item(ResultSet rs) throws SQLException
+		public Item(ResultSet rs) throws SdbException
 		{
-			this.date=rs.getLong(1);
-			this.key=rs.getString(2);
-			this.html=rs.getString(3);
+			try{
+				this.date=rs.getLong(1);
+				this.key=rs.getString(2);
+				this.html=rs.getString(3);
+			}catch(SQLException e){
+				throw new SdbException(e);
+			}
 		}
 		public long date;
 		public String key;
 		public String html;
 	}
-	
+	/*
 	public RowIterable getAll() throws SdbException
 	{
 		try {
@@ -180,5 +179,5 @@ public class HtmlCacheTable extends BaseTable
 			}
 		}
 	}
-	
+*/
 }

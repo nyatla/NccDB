@@ -4,7 +4,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import jp.nyatla.nccdb.table.CoinMasterTable.Item;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
@@ -20,10 +19,10 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public abstract class IdPairTable extends BaseTable
+public class IdPairTable extends BaseTable<IdPairTable.Item>
 {
 
-	private static class IdPairTableInfo extends BasicTableDefinition
+	private static class IdPairTableInfo extends BasicTableDefinition<Item>
 	{
 		private String[] _names;
 		public IdPairTableInfo(String i_table_name,String i_id_name1,String i_id_name2)

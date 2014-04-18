@@ -5,19 +5,20 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
 
-import jp.nyatla.nccdb.table.HtmlCacheTable.Item;
-import jp.nyatla.nccdb.table.HtmlCacheTable.RowIterable;
-import jp.nyatla.nyansat.db.basic.BaseRowIterable;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
+import jp.nyatla.nyansat.db.basic.PsUtils;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.SdbException;
 
-public class CoinSourceUrlTable extends BaseTable
+/**
+ * コイン情報のURLとコインシンボル・名前のペアテーブル。
+ */
+public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 {
-	public final static String NAME="cct_cache";
+	public final static String NAME="cct_sourceurl";
 
-	private static class CoinSourceUrlTableInfo extends BasicTableDefinition
+	private static class CoinSourceUrlTableInfo extends BasicTableDefinition<Item>
 	{
 		private final static String id_symbol="symbol";
 		private final static String id_name="name";
@@ -38,6 +39,9 @@ public class CoinSourceUrlTable extends BaseTable
 				id_url+" text," +
 				"unique("+id_symbol+","+id_name+"))";
 		}
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
+		}
 	}
 	@Override
 	public void dispose() throws SdbException
@@ -45,16 +49,17 @@ public class CoinSourceUrlTable extends BaseTable
 		try {
 			this._ps_insert.close();
 			this._ps_select_by_key.close();
-			this._ps_select_all.close();
+			this._ps_select_by_url.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
+		}finally{
+			super.dispose();
 		}
 	}
 
-//	private PreparedStatement _ps_delete;
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select_by_key;
-	private PreparedStatement _ps_select_all;
+	private PreparedStatement _ps_select_by_url;
 	public CoinSourceUrlTable(SqliteDB i_db,String i_table_name) throws SdbException
 	{
 		super(i_db,new CoinSourceUrlTableInfo(i_table_name));
@@ -66,11 +71,11 @@ public class CoinSourceUrlTable extends BaseTable
 					"insert or ignore into %s(%s,%s,%s) values(?,?,?);",
 					table_name,d[0],d[1],d[2]));
 			this._ps_select_by_key=this._db.getConnection().prepareStatement(
-				String.format("select * from %s where %s=?;",
-				table_name,d[1]));
-			this._ps_select_all=this._db.getConnection().prepareStatement(
-				String.format("select * from %s;",
-				table_name));
+				String.format("select * from %s where %s=? AND %s=?;",
+				table_name,d[0],d[1]));
+			this._ps_select_by_url=this._db.getConnection().prepareStatement(
+					String.format("select * from %s where %s=?;",
+					table_name,d[2]));
 		}catch (SQLException e){
 			throw new SdbException(e);
 		}
@@ -80,7 +85,7 @@ public class CoinSourceUrlTable extends BaseTable
 		try {
 			this._ps_insert.setString(1,i_symbol);
 			this._ps_insert.setString(2,i_name);
-			this._ps_insert.setString(3,i_url);
+			PsUtils.setNullableString(this._ps_insert,3,i_url);
 			this._ps_insert.execute();
 			return this._ps_insert.getUpdateCount()>0;
 		} catch (SQLException e) {
@@ -101,12 +106,12 @@ public class CoinSourceUrlTable extends BaseTable
 		} catch (InterruptedException e) {
 			throw new SdbException(e);
 		}
-	}	
-	public boolean isExist(String i_id1) throws SdbException
+	}
+	public boolean isExistByUrl(String url) throws SdbException
 	{
 		try {
-			this._ps_select_by_key.setString(1,i_id1);
-			ResultSet rs=this._ps_select_by_key.executeQuery();
+			this._ps_select_by_url.setString(1,url);
+			ResultSet rs=this._ps_select_by_url.executeQuery();
 			boolean ret=rs.next();
 			rs.close();
 			return ret;
@@ -114,20 +119,37 @@ public class CoinSourceUrlTable extends BaseTable
 			throw new SdbException(e);
 		}
 	}	
+	public boolean isExist(String symbol, String name) throws SdbException
+	{
+		try {
+			this._ps_select_by_key.setString(1,symbol);
+			this._ps_select_by_key.setString(2,name);
+			ResultSet rs=this._ps_select_by_key.executeQuery();
+			boolean ret=rs.next();
+			rs.close();
+			return ret;
+		} catch (SQLException e) {
+			throw new SdbException(e);
+		}
+	}
 
 	public static class Item
 	{
-		public Item(ResultSet rs) throws SQLException
+		public Item(ResultSet rs) throws SdbException
 		{
-			this.date=rs.getLong(1);
-			this.key=rs.getString(2);
-			this.html=rs.getString(3);
+			try {
+				this.symbol=rs.getString(1);
+				this.name=rs.getString(2);
+				this.url=rs.getString(3);
+			} catch (SQLException e) {
+				throw new SdbException(e);
+			}
 		}
-		public long date;
-		public String key;
-		public String html;
+		public String symbol;
+		public String name;
+		public String url;
 	}
-	
+	/*
 	public RowIterable getAll() throws SdbException
 	{
 		try {
@@ -152,6 +174,5 @@ public class CoinSourceUrlTable extends BaseTable
 				return null;
 			}
 		}
-	}
-	
+	}*/	
 }

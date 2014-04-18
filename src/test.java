@@ -38,8 +38,20 @@ public class test {
 				"-cmd","cct_import_urls",
 				"-cct_db","d:\\html_cache.db"
 		};
+		String[] t11={
+				"-cmd","cct_scrape_url_from_list_thread",
+				"-ua","Mozilla/5.0 (Windows NT 6.3; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0",
+				"-cookie","__cfduid=dfb33923dda01abf919d76a86135d949f1394332025012; itemMarking_forums_items=eJxNk0l2xDAIBe_S6yxcMPEZcrW83D0COxLbMhST_PNJJH--eaVrgJW-Ppnhh5CtTVwwfYkHZW6idGM4vIjJiJFcIs6DcHl8eAKbGNElXh7jNUjHCAYps-mMKbPFqG7tCRvENnEetUyb-CBldkxSZrdBULN7xiBlDhrVUebgScocyEu0OowYU2h5ksakWp7ksUMtT8owK_e9xlxc7wVHzNoXXFw6zbKniJVcJ8sDdWXRM6ljlcdvhw7qreI1EyuotrHs8Ziqm-x-2DwOWakdw4cIP8T-iUVwk5NlLm1-X0sR7erLcYg8WXE9TNIxeQhF18qThWBqcrJgUWR_uYT79eJ4gH4_u_dLSJtcXI_2DvXOjhX9p6RfsvpPyWsW4PcPyeuzKg%2C%2C; _ga=GA1.2.814650664.1394343048; toggleCats=%2C232%2C; session_id=f4bda17e0b7840890b209ea4b2cc1df9; modtids=%2C",
+				"-cct_db","d:\\html_cache.db"
+		};
+		String[] t12={
+				"-cmd","cct_scrape_url_from_thread",
+				"-ua","Mozilla/5.0 (Windows NT 6.3; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0",
+				"-cookie","__cfduid=dfb33923dda01abf919d76a86135d949f1394332025012; itemMarking_forums_items=eJxNk0l2xDAIBe_S6yxcMPEZcrW83D0COxLbMhST_PNJJH--eaVrgJW-Ppnhh5CtTVwwfYkHZW6idGM4vIjJiJFcIs6DcHl8eAKbGNElXh7jNUjHCAYps-mMKbPFqG7tCRvENnEetUyb-CBldkxSZrdBULN7xiBlDhrVUebgScocyEu0OowYU2h5ksakWp7ksUMtT8owK_e9xlxc7wVHzNoXXFw6zbKniJVcJ8sDdWXRM6ljlcdvhw7qreI1EyuotrHs8Ziqm-x-2DwOWakdw4cIP8T-iUVwk5NlLm1-X0sR7erLcYg8WXE9TNIxeQhF18qThWBqcrJgUWR_uYT79eJ4gH4_u_dLSJtcXI_2DvXOjhX9p6RfsvpPyWsW4PcPyeuzKg%2C%2C; _ga=GA1.2.814650664.1394343048; toggleCats=%2C232%2C; session_id=f4bda17e0b7840890b209ea4b2cc1df9; modtids=%2C",
+				"-cct_db","d:\\html_cache.db"
+		};
 		
-		String[] test=t2;
+		String[] test=t5;
 		Main.main(test);
 	/*	
 		String[] s={

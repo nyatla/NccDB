@@ -3,22 +3,20 @@ package jp.nyatla.nccdb.table;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Iterator;
 
-import jp.nyatla.nccdb.table.ServiceUrlTable.Item;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
-import jp.nyatla.nyansat.db.basic.BaseRowIterable;
 import jp.nyatla.nyansat.db.basic.BasicViewDefinition;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.RsUtils;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.view.BaseView;
 import jp.nyatla.nyansat.utils.CsvWriter;
 import jp.nyatla.nyansat.utils.SdbException;
 
-public class CoinInfoView extends BaseView
+public class CoinInfoView extends BaseView<CoinInfoView.Item>
 {
 	public final static String NAME="coin_info";	
-	private static class TableDef extends BasicViewDefinition
+	private static class TableDef extends BasicViewDefinition<Item>
 	{
 		private String[] _cols={
 			CoinMasterTable.DN_id,
@@ -53,6 +51,11 @@ public class CoinInfoView extends BaseView
 		public String[] getElementNames() {
 			return this._cols;
 		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException
+		{
+			return new Item(rs);
+		}
 	}
 	private PreparedStatement _ps_select_all;
 	@Override
@@ -81,33 +84,18 @@ public class CoinInfoView extends BaseView
 			throw new SdbException(e);
 		}
 	}
-	public RowIterable getAll() throws SdbException
+
+	public RowIterable<Item> getAllAsc() throws SdbException
 	{
 		try {
 			ResultSet rs=this._ps_select_all.executeQuery();
-			return new RowIterable(rs);
+			return new RowIterable<Item>(rs,this._view_info);
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
 	}
 
-	public final class RowIterable extends BaseRowIterable<Item>
-	{
-		public RowIterable(ResultSet i_rs)
-		{
-			super(i_rs);
-		}
-
-		@Override
-		protected Item createItem(ResultSet i_rs) throws SdbException
-		{
-			try {
-				return new Item(i_rs);
-			} catch (SQLException e) {
-				return null;
-			}
-		}
-	}	
+	
 
 	public String[] getColHeader()
 	{
@@ -122,7 +110,7 @@ public class CoinInfoView extends BaseView
 			CoinSpecTable.DN_id_algorism
 		};
 	}
-	public class Item
+	public static class Item
 	{
 		public int coin_id;
 		public String symbol;
@@ -132,16 +120,20 @@ public class CoinInfoView extends BaseView
 		public Double total_coin;
 		public Double premine;
 		public int id_algorism;
-		public Item(ResultSet i_rs) throws SQLException
+		public Item(ResultSet i_rs) throws SdbException
 		{
-			this.coin_id=i_rs.getInt(CoinMasterTable.DN_id);
-			this.symbol=i_rs.getString(CoinMasterTable.DN_symbol);
-			this.name=i_rs.getString(CoinMasterTable.DN_name);
-			this.alias=RsUtils.getNullableInt(i_rs,CoinMasterTable.DN_alias_id);
-			this.start_date=RsUtils.getNullableLong(i_rs,CoinMasterTable.DN_start_date);
-			this.total_coin=RsUtils.getNullableDouble(i_rs,CoinSpecTable.DN_total_coin);
-			this.premine=RsUtils.getNullableDouble(i_rs,CoinSpecTable.DN_premine);
-			this.id_algorism=i_rs.getInt(CoinSpecTable.DN_id_algorism);
+			try{
+				this.coin_id=i_rs.getInt(CoinMasterTable.DN_id);
+				this.symbol=i_rs.getString(CoinMasterTable.DN_symbol);
+				this.name=i_rs.getString(CoinMasterTable.DN_name);
+				this.alias=RsUtils.getNullableInt(i_rs,CoinMasterTable.DN_alias_id);
+				this.start_date=RsUtils.getNullableLong(i_rs,CoinMasterTable.DN_start_date);
+				this.total_coin=RsUtils.getNullableDouble(i_rs,CoinSpecTable.DN_total_coin);
+				this.premine=RsUtils.getNullableDouble(i_rs,CoinSpecTable.DN_premine);
+				this.id_algorism=i_rs.getInt(CoinSpecTable.DN_id_algorism);
+			}catch(SQLException e){
+				throw new SdbException(e);
+			}
 		}
 		public String[] toCsvArrray()
 		{

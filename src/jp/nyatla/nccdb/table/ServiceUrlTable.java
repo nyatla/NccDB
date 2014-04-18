@@ -3,20 +3,15 @@ package jp.nyatla.nccdb.table;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Iterator;
 
-import jp.nyatla.nccdb.table.CoinInfoView.Item;
-import jp.nyatla.nccdb.table.CoinInfoView.RowIterable;
-import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
-import jp.nyatla.nyansat.db.basic.BaseRowIterable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
 import jp.nyatla.nyansat.db.basic.PsUtils;
 import jp.nyatla.nyansat.db.basic.RsUtils;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.UpdateSqlBuilder;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
-import jp.nyatla.nyansat.utils.CsvWriter;
 import jp.nyatla.nyansat.utils.SdbException;
 
 /**
@@ -33,7 +28,7 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public class ServiceUrlTable extends BaseTable
+public class ServiceUrlTable extends BaseTable<ServiceUrlTable.Item>
 {
 	public final static String NAME="service_url";
 	public final static String DN_id="id";
@@ -43,7 +38,7 @@ public class ServiceUrlTable extends BaseTable
 	public final static String DN_url="url";	
 	public final static String DN_description="description";	
 
-	private static class TableDef extends BasicTableDefinition
+	private static class TableDef extends BasicTableDefinition<Item>
 	{
 		private String[] _cols={
 				DN_id,DN_name,DN_id_coin_url_type,DN_id_coin_url_status,DN_url,DN_description};
@@ -66,6 +61,10 @@ public class ServiceUrlTable extends BaseTable
 		public String[] getElementNames() {
 			return this._cols;
 		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
+		}
 	}	
 
 	public String[] getColHeader()
@@ -79,7 +78,7 @@ public class ServiceUrlTable extends BaseTable
 			this._ps_select_by_name_type.close();
 			this._ps_select_by_url_type.close();
 			this._ps_insert.close();
-			this._ps_select_all.close();
+			this._ps_select_all_asc.close();
 			this._ps_update.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
@@ -87,7 +86,7 @@ public class ServiceUrlTable extends BaseTable
 	}
 
 	private PreparedStatement _ps_insert;
-	private PreparedStatement _ps_select_all;
+	private PreparedStatement _ps_select_all_asc;
 	private PreparedStatement _ps_update;
 	private PreparedStatement _ps_select_by_name_type;
 	private PreparedStatement _ps_select_by_url_type;
@@ -102,7 +101,7 @@ public class ServiceUrlTable extends BaseTable
 			String table_name=this._table_info.getTableName();
 			this._ps_insert=this._db.getConnection().prepareStatement("insert or ignore into "+table_name+
 				"("+DN_name+","+DN_id_coin_url_type+","+DN_id_coin_url_status+","+DN_url+","+DN_description+") values(?,?,?,?,?);");
-			this._ps_select_all=this._db.getConnection().prepareStatement(
+			this._ps_select_all_asc=this._db.getConnection().prepareStatement(
 				String.format("select * from %s ORDER BY %s ASC;", table_name,DN_name));
 			this._ps_select_by_name_type=this._db.getConnection().prepareStatement(
 				String.format("select * from %s where %s=? and %s=?;",table_name,DN_name,DN_id_coin_url_type));
@@ -172,14 +171,18 @@ public class ServiceUrlTable extends BaseTable
 	
 	public static class Item
 	{
-		public Item(ResultSet i_rs) throws SQLException, SdbException
+		public Item(ResultSet i_rs) throws SdbException
 		{
-			this.id=i_rs.getInt(DN_id);
-			this.name=i_rs.getString(DN_name);
-			this.id_coin_url_type=i_rs.getInt(DN_id_coin_url_type);
-			this.id_coin_url_status=RsUtils.getNullableInt(i_rs,DN_id_coin_url_status);
-			this.url=i_rs.getString(DN_url);
-			this.description=i_rs.getString(DN_description);
+			try{
+				this.id=i_rs.getInt(DN_id);
+				this.name=i_rs.getString(DN_name);
+				this.id_coin_url_type=i_rs.getInt(DN_id_coin_url_type);
+				this.id_coin_url_status=RsUtils.getNullableInt(i_rs,DN_id_coin_url_status);
+				this.url=i_rs.getString(DN_url);
+				this.description=i_rs.getString(DN_description);
+			}catch(SQLException e){
+				throw new SdbException(e);
+			}
 		}
 		public int id;
 		public String name;
@@ -199,11 +202,11 @@ public class ServiceUrlTable extends BaseTable
 				};
 		}
 	}
-	public RowIterable getAll() throws SdbException
+	public RowIterable<Item> getAllAsc() throws SdbException
 	{
 		try {
-			ResultSet rs=this._ps_select_all.executeQuery();
-			return new RowIterable(rs);
+			ResultSet rs=this._ps_select_all_asc.executeQuery();
+			return new RowIterable<Item>(rs,this._table_info);
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -251,7 +254,8 @@ public class ServiceUrlTable extends BaseTable
 		}catch(SQLException e){
 			throw new SdbException(e);
 		}
-	}	
+	}
+/*
 	public final class RowIterable extends BaseRowIterable<Item>
 	{
 		public RowIterable(ResultSet i_rs)
@@ -268,5 +272,6 @@ public class ServiceUrlTable extends BaseTable
 				return null;
 			}
 		}
-	}
+	}*/
+
 }

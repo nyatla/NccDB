@@ -20,5 +20,4 @@ public class CoinUrlIdPairTable extends IdPairTable
 	{
 		this(i_db,NAME);
 	}
-	
 }

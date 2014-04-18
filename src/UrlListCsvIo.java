@@ -2,6 +2,7 @@ import java.io.IOException;
 
 import jp.nyatla.nccdb.table.*;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.CsvReader;
@@ -75,7 +76,7 @@ public class UrlListCsvIo
 			civ=new ServiceUrlTable(i_db);
 			writer.writeCol(civ.getColHeader());
 			writer.next();
-			ServiceUrlTable.RowIterable it=civ.getAll();
+			RowIterable<ServiceUrlTable.Item> it=civ.getAllAsc();
 			int p=1;
 			for(ServiceUrlTable.Item i :it){
 				Logger.log(p+":"+i.name);

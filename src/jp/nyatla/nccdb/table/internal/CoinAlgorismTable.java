@@ -1,7 +1,7 @@
 package jp.nyatla.nccdb.table.internal;
 
 import jp.nyatla.nyansat.db.basic.table.internal.InternalNameTable;
-import jp.nyatla.nyansat.utils.SdbException;
+
 
 public final class CoinAlgorismTable extends InternalNameTable
 {

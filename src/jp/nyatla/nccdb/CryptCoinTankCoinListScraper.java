@@ -18,11 +18,11 @@ import org.jsoup.select.*;
 
 
 /**
- * CryptCoinTankのコインリストスレッドから、コイン名とシンボルを抽出してデータベースへ登録する。
- * 重複は無視する。
+ * CryptCoinTankのコインリストスレッドから、コイン名とシンボルを抽出するスクレイパーです。
+ * 
  *
  */
-public class CryptCoinTankListScraper extends BaseObject
+public class CryptCoinTankCoinListScraper extends BaseObject
 {	
 	public class Item
 	{
@@ -41,15 +41,19 @@ public class CryptCoinTankListScraper extends BaseObject
 		}
 	}
 	private BasicHttpClient _httpcl;
-	public CryptCoinTankListScraper(String i_ua, String i_cookie) throws SdbException
+	public CryptCoinTankCoinListScraper(String i_ua, String i_cookie) throws SdbException
 	{
 		this._httpcl=new BasicHttpClient();
 		this._httpcl.setSession(i_ua,i_cookie);
 	}
 
-	public void append(String i_url,ArrayList<Item> i_dest) throws SdbException
+	private boolean append(String i_url,ArrayList<Item> i_dest) throws SdbException
 	{
 		Document d=this._httpcl.httpGet(i_url);
+		if(d==null && this._httpcl.getLastStatus()!=200){
+			//HTTPエラー？
+			return false;
+		}
 		//ドキュメントのパース
 		Element el_content=d.getElementById("content");
 		Elements el_tds=el_content.select("h4 a");
@@ -72,18 +76,23 @@ public class CryptCoinTankListScraper extends BaseObject
 				i_dest.add(new Item(p[p.length-1],t,h));
 			}
 		}
+		return true;
 	}
 	public ArrayList<Item> parse(String i_url) throws SdbException
 	{
 		ArrayList<Item> l=new ArrayList<Item>();
-		this.append(i_url,l);
+		if(!this.append(i_url,l)){
+			return null;
+		}
 		return l;
 	}
 	public ArrayList<Item> parse(String[] i_url) throws SdbException
 	{
 		ArrayList<Item> l=new ArrayList<Item>();
 		for(int i=i_url.length-1;i>=0;i--){
-			this.append(i_url[i],l);
+			if(!this.append(i_url[i],l)){
+				return null;
+			}
 		}
 		return l;
 	}

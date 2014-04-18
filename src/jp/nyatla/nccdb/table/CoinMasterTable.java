@@ -4,7 +4,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import jp.nyatla.nyansat.db.basic.BaseRowIterable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
 import jp.nyatla.nyansat.db.basic.InsertSqlBuilder;
 import jp.nyatla.nyansat.db.basic.PsUtils;
@@ -33,7 +33,7 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public class CoinMasterTable extends BaseTable
+public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 {
 	public final static String NAME="coin_master";
 	public final static String DN_id="id";
@@ -44,7 +44,7 @@ public class CoinMasterTable extends BaseTable
 	public final static String DN_spec_id="spec_id";
 	public final static String DN_comment="comment";
 
-	private static class TableDef extends BasicTableDefinition
+	private static class TableDef extends BasicTableDefinition<Item>
 	{
 		private String[] _cols={
 				DN_id,DN_symbol,DN_name,DN_alias_id,DN_start_date,DN_spec_id,DN_comment};
@@ -67,6 +67,10 @@ public class CoinMasterTable extends BaseTable
 		@Override
 		public String[] getElementNames() {
 			return this._cols;
+		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
 		}
 	}	
 
@@ -91,7 +95,7 @@ public class CoinMasterTable extends BaseTable
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_update;
 	private PreparedStatement _ps_search_symbol;
-	private PreparedStatement _ps_select_all;
+	private PreparedStatement _ps_select_all_asc;
 	
 	public CoinMasterTable(SqliteDB i_db) throws SdbException
 	{
@@ -104,7 +108,7 @@ public class CoinMasterTable extends BaseTable
 			String table_name=this._table_info.getTableName();
 			this._ps_search_symbol=this._db.getConnection().prepareStatement("select * from "+table_name +
 				" where "+DN_symbol+"=? and "+DN_name+"=?;");
-			this._ps_select_all=this._db.getConnection().prepareStatement(
+			this._ps_select_all_asc=this._db.getConnection().prepareStatement(
 					"select * from "+table_name +" ORDER BY "+CoinMasterTable.DN_symbol+" ASC;");
 		} catch (SQLException e) {
 			throw new SdbException(e);
@@ -317,15 +321,19 @@ public class CoinMasterTable extends BaseTable
 			this.comment=i_comment;
 			return;
 		}
-		public Item(ResultSet i_rs) throws SQLException
+		public Item(ResultSet i_rs) throws SdbException
 		{
-			this.id=i_rs.getInt(DN_id);
-			this.coin_symbol	=i_rs.getString(DN_symbol);
-			this.coin_name		=i_rs.getString(DN_name);
-			this.alias_id		=RsUtils.getNullableInt(i_rs,DN_alias_id);
-			this.start_date		=RsUtils.getNullableLong(i_rs,DN_start_date);
-			this.spec_id		=RsUtils.getNullableInt(i_rs,DN_spec_id);
-			this.comment		=i_rs.getString(DN_comment);			
+			try{
+				this.id=i_rs.getInt(DN_id);
+				this.coin_symbol	=i_rs.getString(DN_symbol);
+				this.coin_name		=i_rs.getString(DN_name);
+				this.alias_id		=RsUtils.getNullableInt(i_rs,DN_alias_id);
+				this.start_date		=RsUtils.getNullableLong(i_rs,DN_start_date);
+				this.spec_id		=RsUtils.getNullableInt(i_rs,DN_spec_id);
+				this.comment		=i_rs.getString(DN_comment);
+			} catch (SQLException e){
+				throw new SdbException(e);
+			}
 		}
 	}
 
@@ -362,7 +370,17 @@ public class CoinMasterTable extends BaseTable
 			throw new SdbException(e);
 		}
 	}
-
+	public RowIterable<Item> getAllAsc() throws SdbException
+	{
+		try {
+			ResultSet rs=this._ps_select_all_asc.executeQuery();
+			return new RowIterable<Item>(rs,this._table_info);
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
+	}
+	
+/*
 	public RowIterable getAll() throws SdbException
 	{
 		try {
@@ -387,6 +405,7 @@ public class CoinMasterTable extends BaseTable
 				return null;
 			}
 		}
-	}	
+	}
+*/
 
 }

@@ -1,13 +1,11 @@
-import java.io.IOException;
 
 import jp.nyatla.nccdb.table.CoinMasterTable;
 import jp.nyatla.nccdb.table.CoinUrlIdPairTable;
 import jp.nyatla.nccdb.table.ServiceUrlTable;
 import jp.nyatla.nccdb.table.IdPairTable;
-import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
-import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.CsvReader;
 import jp.nyatla.nyansat.utils.CsvWriter;
@@ -184,7 +182,7 @@ public class ServiceCoinCsvIo
 			}
 			writer.next();
 			String[] row=new String[service_names.length+2];
-			CoinMasterTable.RowIterable it=coin_master.getAll();
+			RowIterable<CoinMasterTable.Item> it=coin_master.getAllAsc();
 			for(CoinMasterTable.Item ci:it)
 			{
 				row[0]=ci.coin_symbol;

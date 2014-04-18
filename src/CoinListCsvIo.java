@@ -2,9 +2,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import jp.nyatla.nccdb.CryptCoinTankListScraper;
+import jp.nyatla.nccdb.CryptCoinTankCoinListScraper;
 import jp.nyatla.nccdb.table.*;
+import jp.nyatla.nccdb.table.CoinMasterTable.Item;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.CsvReader;
@@ -148,7 +150,7 @@ public class CoinListCsvIo
 			civ=new CoinInfoView(i_db);
 			writer.writeCol(civ.getColHeader());
 			writer.next();
-			CoinInfoView.RowIterable it=civ.getAll();
+			RowIterable<CoinInfoView.Item> it=civ.getAllAsc();
 			int p=0;
 			for(CoinInfoView.Item i :it){
 				Logger.log(p+":"+i.symbol+" "+i.name);
@@ -176,7 +178,7 @@ public class CoinListCsvIo
 		CoinMasterTable ctt=null;
 		CoinSpecTable cst=null;
 		//URLリストの構築
-		String[] url_list=CC_URL_LIST;
+		String[] url_list=UrlData.CC_URL_LIST;
 		{
 			String l=ap.getString("-url", null);
 			if(l!=null){
@@ -200,13 +202,16 @@ public class CoinListCsvIo
 				}
 			}
 			
-			CryptCoinTankListScraper scp=new CryptCoinTankListScraper(ap.getString("-ua",null),ap.getString("-cookie",null));
+			CryptCoinTankCoinListScraper scp=new CryptCoinTankCoinListScraper(ap.getString("-ua",null),ap.getString("-cookie",null));
 			//CoinListの取得
 			for(int i2=0;i2<url_list.length;i2++){
 				Logger.log("Scan URL="+url_list[i2]);
-				ArrayList<CryptCoinTankListScraper.Item> items=scp.parse(url_list[i2]);
+				ArrayList<CryptCoinTankCoinListScraper.Item> items=scp.parse(url_list[i2]);
+				if(items==null){
+					throw new SdbException();
+				}
 				//テーブルを追記
-				for(CryptCoinTankListScraper.Item i:items){
+				for(CryptCoinTankCoinListScraper.Item i:items){
 					boolean is_cct=ctt.add(i.symbol,i.name,null,null,csti.id);
 					Logger.log("["+(is_cct?"ADD":"DROP")+"]"+i.symbol+":"+i.name);
 				}
@@ -254,16 +259,6 @@ public class CoinListCsvIo
 		Logger.log("done.");
 	}
 	
-	public static String[] CC_URL_LIST={
-		"https://cryptocointalk.com/forum/557-unlaunched-cryptocoins/",
-		"https://cryptocointalk.com/forum/40-new-cryptocoins/",
-		"https://cryptocointalk.com/forum/178-scrypt-cryptocoins/",
-		"https://cryptocointalk.com/forum/886-dying-scrypt-cryptocoins/",
-		"https://cryptocointalk.com/forum/179-sha-256-cryptocoins/",
-		"https://cryptocointalk.com/forum/887-dying-sha256-cryptocoins/",
-		"https://cryptocointalk.com/forum/302-other-algo-cryptocoins/",
-		"https://cryptocointalk.com/forum/888-dying-other-algo-cryptocoins/"		
-	};
 	public static final String CSV_PATH="coinspec.csv";
 	
 	public static String readme()

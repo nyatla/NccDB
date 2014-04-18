@@ -9,9 +9,10 @@ import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 
-import jp.nyatla.nccdb.CryptCoinTankListScraper;
-import jp.nyatla.nccdb.CryptCoinTankListScraper.Item;
+import jp.nyatla.nccdb.CryptCoinTankCoinListScraper;
+import jp.nyatla.nccdb.CryptCoinTankCoinListScraper.Item;
 import jp.nyatla.nccdb.table.CoinMasterTable;
+import jp.nyatla.nccdb.table.CoinSourceUrlTable;
 import jp.nyatla.nccdb.table.CoinSpecTable;
 import jp.nyatla.nccdb.table.CoinUrlIdPairTable;
 import jp.nyatla.nccdb.table.HtmlCacheTable;
@@ -39,7 +40,7 @@ public class CctHtmlCache
 		Logger.log("Start getInformationCoinThread");
 		CoinMasterTable ctt=null;
 		//URLリストの構築
-		String[] url_list=CoinListCsvIo.CC_URL_LIST;
+		String[] url_list=UrlData.CC_URL_LIST;
 		{
 			String l=ap.getString("url", null);
 			if(l!=null){
@@ -53,15 +54,18 @@ public class CctHtmlCache
 		try{
 			String ua=ap.getString("-ua",null);
 			String cookie=ap.getString("-cookie",null);
-			CryptCoinTankListScraper scp=new CryptCoinTankListScraper(ua,cookie);
+			CryptCoinTankCoinListScraper scp=new CryptCoinTankCoinListScraper(ua,cookie);
 			//CoinListの取得
 			for(int i2=0;i2<url_list.length;i2++){
 				Logger.log("Scan URL="+url_list[i2]);
-				ArrayList<CryptCoinTankListScraper.Item> items=scp.parse(url_list[i2]);
+				ArrayList<CryptCoinTankCoinListScraper.Item> items=scp.parse(url_list[i2]);
+				if(items==null){
+					throw new SdbException();
+				}
 				//テーブルを追記
 				BasicHttpClient httpcl=new BasicHttpClient();
 				httpcl.setSession(ua,cookie);
-				for(CryptCoinTankListScraper.Item i:items){
+				for(CryptCoinTankCoinListScraper.Item i:items){
 					//既にデータベースにあるコインコードなら無視
 					if(hct.isExist(i.symbol+":"+i.name))
 					{
@@ -321,17 +325,188 @@ public class CctHtmlCache
 		}
 		Logger.log("done.");
 	}
+	private static void scrapeFromCoinList(ArgHelper ap,SqliteDB i_db) throws SdbException
+	{
+		Logger.log("Start name,symbol,url scraping from CryptocoinTalk Coin thread");
+		CoinMasterTable ctt=null;
+		//URLリストの構築
+		String[] url_list=UrlData.CC_URL_LIST;
+		{
+			String l=ap.getString("url", null);
+			if(l!=null){
+				url_list=l.split(",");
+			}
+		}
+		CoinSourceUrlTable csu=new CoinSourceUrlTable(i_db,CoinSourceUrlTable.NAME);
+		//tableオープン
+//		HtmlCacheTable hct=new HtmlCacheTable(i_db,HtmlCacheTable.NAME);
+		i_db.beginTransaction();
+		try{
+			String ua=ap.getString("-ua",null);
+			String cookie=ap.getString("-cookie",null);
+			CryptCoinTankCoinListScraper scp=new CryptCoinTankCoinListScraper(ua,cookie);
+			//CoinListの取得
+			for(int i2=0;i2<url_list.length;i2++){
+				Logger.log("Scan URL="+url_list[i2]);
+				ArrayList<CryptCoinTankCoinListScraper.Item> items=scp.parse(url_list[i2]);
+				if(items==null){
+					throw new SdbException();
+				}
+				//テーブルを追記
+				BasicHttpClient httpcl=new BasicHttpClient();
+				httpcl.setSession(ua,cookie);
+				for(CryptCoinTankCoinListScraper.Item i:items){
+					//既にデータベースにあるコインコードなら無視
+					if(csu.isExist(i.symbol,i.name))
+					{
+						Logger.log("[EXIST]"+i.symbol+":"+i.name);
+						continue;
+					}
+					//
+					Document d=httpcl.httpGet(i.href);
+					//Information Threadを探す
+					Element el_content=d.getElementById("forum_table");
+					Elements el_tds=el_content.select("h4 a");
+					L1: for(int i3=0;i3<el_tds.size();i3++){
+						String s=el_tds.get(i3).text();
+						String h=el_tds.get(i3).attr("href");
+						//入れ子リストは無視
+						if(!s.trim().matches(".+Information( .+)?$")){
+							continue;
+						}
+						if(csu.add(i.symbol,i.name,h)){
+							Logger.log("[ADD]"+i.symbol+":"+i.name);
+						}else{
+							Logger.log("[ERROR]"+i.symbol+":"+i.name);
+						}
+						continue L1;
+					}
+					if(csu.add(i.symbol,i.name,null)){
+						Logger.log("[PARTIAL]"+i.symbol+":"+i.name);
+					}else{
+						Logger.log("[ERROR]"+i.symbol+":"+i.name);
+					}
+				}
+			}
+			i_db.commit();			
+		}finally{
+			i_db.endTransaction();			
+			if(ctt!=null){
+				ctt.dispose();
+			}
+			if(csu!=null){
+				csu.dispose();
+			}
+		}
+		Logger.log("done.");
+	}
+
+	private static void scrapeFromCctThread(ArgHelper ap,SqliteDB i_db) throws SdbException
+	{
+		Logger.log("Start name,symbol,url scraping from CryptocoinTalk Coin thread");
+		CoinMasterTable ctt=null;
+		//URLリストの構築
+		String target_url=ap.getString("url",UrlData.CC_ANNOUNCEMENT_URL);
+
+		//?prune_day=100&sort_by=Z-A&sort_key=last_post&topicfilter=all
+		CoinSourceUrlTable csu=new CoinSourceUrlTable(i_db,CoinSourceUrlTable.NAME);
+		//tableオープン
+//		HtmlCacheTable hct=new HtmlCacheTable(i_db,HtmlCacheTable.NAME);
+		i_db.beginTransaction();
+		try{
+			String ua=ap.getString("-ua",null);
+			String cookie=ap.getString("-cookie",null);
+			CryptCoinTankCoinListScraper scp=new CryptCoinTankCoinListScraper(ua,cookie);
+			//CoinListの取得
+			for(int i2=0;;i2++){
+				int number_of_add=0;
+				String url=target_url+String.format("%s?prune_day=100&sort_by=Z-A&sort_key=last_post&topicfilter=all",(i2==0)?"":"page-"+(i2+1));
+				Logger.log("Scan URL="+url);
+				ArrayList<CryptCoinTankCoinListScraper.Item> items=scp.parse(url);
+				if(items==null){
+					break;
+				}
+				for(int i3=0;i3<items.size();i3++){
+					if(csu.isExistByUrl(items.get(i3).href)){
+						Logger.log("[EXIST]"+items.get(i3).href);
+						continue;
+					}
+					if(csu.add(items.get(i3).href)){
+						Logger.log("[ADD]"+items.get(i3).href);
+						number_of_add++;
+					}else{
+						Logger.log("[EXIST]"+items.get(i3).href);
+					}
+				}
+				if(number_of_add==0){
+					break;
+				}
+			}
+			i_db.commit();
+		}finally{
+			i_db.endTransaction();			
+			if(ctt!=null){
+				ctt.dispose();
+			}
+			if(csu!=null){
+				csu.dispose();
+			}
+		}
+		Logger.log("done.");
+	}
+	/**
+	 * SourceURLからCoinMasterへ存在しないコインをインポートする。
+	 * @param ap
+	 * @param i_db
+	 * @throws SdbException
+	 */
+	private static void importCoinList(ArgHelper ap,SqliteDB i_db) throws SdbException
+	{
+		Logger.log("Start syncryptCoinList");
+		CoinMasterTable ctt=null;
+		CoinSourceUrlTable csu=null;
+		//tableオープン
+		i_db.beginTransaction();
+		try{
+			ctt=new CoinMasterTable(i_db);
+			csu=new CoinSourceUrlTable(i_db,CoinSourceUrlTable.NAME);
+			//nullスペックのidを取得
+			CoinSourceUrlTable.Item csti=csu.getAll();
+			for(;;){
+				if(ctt.isExist("symbol","name")){
+					Logger.log("[EXISTS]"+i.symbol+":"+i.name);
+					continue;
+				}
+				//add
+				Logger.log("[ADD]"+i.symbol+":"+i.name);
+			}
+			i_db.commit();			
+		}finally{
+			i_db.endTransaction();			
+			if(ctt!=null){
+				ctt.dispose();
+			}
+			if(csu!=null){
+				csu.dispose();
+			}
+		}
+		Logger.log("done.");
+		
+	}	
 	public static String readme()
 	{
 		return
 			CoinListCsvIo.class.getName()+"\n"+
-			"-cmd cct_html_cache [-cct_db CCTDB] [-u UA] [-url URL] [-cookie COOKIE]\n"+
+			"-cmd cct_html_cache [-cct_db CCTDB] [-u UA] [-url COIN_LIST_URL] [-cookie COOKIE]\n"+
 			"-cmd cct_import_urls [-cct_db DB] [-csv CSV]\n"+
+			"-cmd cct_scrape_url_from_list_thread [-cct_db CCTDB] [-u UA] [-url CCT_COIN_LIST_URL] [-cookie COOKIE]\n"+
+			"-cmd cct_scrape_url_from_thread [-cct_db CCTDB] [-u UA] [-url CCT_THREAD_URL] [-cookie COOKIE]\n"+
 			"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
 			"	CCTDB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_HTML_CACHE_DB_PATH+"\n"+
-			"	UA - User agent parametor for http get.\n"+
-			"	URL - CSV style URL list of cryptocointalk.com thread. default=set of cryptocointalk.com thread.\n"+
-			"	COOKIE - Cookie parametor for http get.";
+			"	UA - HTTPリクエストのユーザエージェント\n"+
+			"	COOKIE - HTTPリクエストに使うCookie値"+
+			"	CCT_COIN_LIST_URL - CryptocoinTalk.comのコインリストスレッドリスト。CSVスタイル\n"+
+			"	CCT_THREAD_URL - CryptocoinTalk.comのスレッド";
 	}	
 	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
@@ -339,11 +514,17 @@ public class CctHtmlCache
 			//スレッドからHTMLをキャッシュ
 			getInformationCoinThread(args,args.getHtmlCache());
 		}else if(i_cmd.compareTo("cct_import_urls")==0){
-			//HTMLからコインペアへ
+			//HTMLからコインペアへサービスURLリストをインポート
 			extractCoinUrl(args);
+		}else if(i_cmd.compareTo("cct_scrape_url_from_list_thread")==0){
+			//コインリストからコインソースURLテーブルへデータをスクレイプ
+			scrapeFromCoinList(args,args.getHtmlCache());
+		}else if(i_cmd.compareTo("cct_scrape_url_from_thread")==0){
+			//CryptocoinTalkのスレッドからURLリストをインポート
+			scrapeFromCctThread(args,args.getHtmlCache());
 		}else{
 			return false;
 		}
 		return true;
-	}	
+	}
 }

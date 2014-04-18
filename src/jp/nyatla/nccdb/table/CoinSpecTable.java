@@ -26,14 +26,14 @@ import jp.nyatla.nyansat.utils.SdbException;
  * unique(cpu_id,processor_number)
  * </p>
  */
-public class CoinSpecTable extends BaseTable
+public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 {
 	public final static String NAME="coin_spec";
 	public final static String DN_id="id";
 	public final static String DN_total_coin="total_coin";
 	public final static String DN_premine="premine";
 	public final static String DN_id_algorism="id_coin_algorism";
-	private static class TableDef extends BasicTableDefinition
+	private static class TableDef extends BasicTableDefinition<Item>
 	{
 		private String[] _cols={
 				DN_id,DN_total_coin,DN_premine,DN_id_algorism};
@@ -252,4 +252,5 @@ public class CoinSpecTable extends BaseTable
 		}
 		
 	}
+
 }
