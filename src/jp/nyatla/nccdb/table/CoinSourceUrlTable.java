@@ -16,6 +16,9 @@ import jp.nyatla.nyansat.utils.SdbException;
  */
 public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 {
+	public final static int DOMAIN_UNKNOWN=0;
+	public final static int DOMAIN_CCT=1;
+	public final static int DOMAIN_BCT=2;
 	public final static String NAME="cct_sourceurl";
 
 	private static class CoinSourceUrlTableInfo extends BasicTableDefinition<Item>
@@ -23,19 +26,21 @@ public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 		private final static String id_symbol="symbol";
 		private final static String id_name="name";
 		private final static String id_url="url";
+		private final static String id_domain="domain";
 		public CoinSourceUrlTableInfo(String i_table_name)
 		{
 			super(i_table_name);
 		}
 		@Override
 		public String[] getElementNames() {
-			return new String[]{id_symbol,id_name,id_url};
+			return new String[]{id_symbol,id_name,id_domain,id_url};
 		}
 		@Override
 		public String getCreateStr(){
 			return "("+
 				id_symbol+" text,"+
 				id_name+" text,"+
+				id_domain+" integer,"+
 				id_url+" text," +
 				"unique("+id_symbol+","+id_name+"))";
 		}
@@ -68,36 +73,38 @@ public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 			String table_name=this._table_info.getTableName();
 			this._ps_insert=this._db.getConnection().prepareStatement(
 				String.format(
-					"insert or ignore into %s(%s,%s,%s) values(?,?,?);",
-					table_name,d[0],d[1],d[2]));
+					"insert or ignore into %s(%s,%s,%s,%s) values(?,?,?,?);",
+					table_name,d[0],d[1],d[2],d[3]));
 			this._ps_select_by_key=this._db.getConnection().prepareStatement(
-				String.format("select * from %s where %s=? AND %s=?;",
-				table_name,d[0],d[1]));
+				String.format("select * from %s where %s=? AND %s=? AND %s=?;",
+				table_name,d[0],d[1],d[2]));
 			this._ps_select_by_url=this._db.getConnection().prepareStatement(
 					String.format("select * from %s where %s=?;",
-					table_name,d[2]));
+					table_name,d[3]));
 		}catch (SQLException e){
 			throw new SdbException(e);
 		}
 	}
-	public boolean add(String i_symbol,String i_name,String i_url) throws SdbException
+	public boolean add(String i_symbol,String i_name,int i_domain,String i_url) throws SdbException
 	{
 		try {
 			this._ps_insert.setString(1,i_symbol);
 			this._ps_insert.setString(2,i_name);
-			PsUtils.setNullableString(this._ps_insert,3,i_url);
+			this._ps_insert.setInt(3,i_domain);
+			PsUtils.setNullableString(this._ps_insert,4,i_url);
 			this._ps_insert.execute();
 			return this._ps_insert.getUpdateCount()>0;
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
 	}
-	public boolean add(String i_url) throws SdbException
+	public boolean add(int i_domain,String i_url) throws SdbException
 	{
 		try {
 			this._ps_insert.setString(1,Long.toString(((new Date()).getTime())));
 			this._ps_insert.setNull(2,java.sql.Types.CHAR);
-			this._ps_insert.setString(3,i_url);
+			this._ps_insert.setInt(3,i_domain);
+			this._ps_insert.setString(4,i_url);
 			this._ps_insert.execute();
 			Thread.sleep(10);
 			return this._ps_insert.getUpdateCount()>0;
@@ -119,11 +126,12 @@ public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 			throw new SdbException(e);
 		}
 	}	
-	public boolean isExist(String symbol, String name) throws SdbException
+	public boolean isExist(String symbol, String name,int i_domain) throws SdbException
 	{
 		try {
 			this._ps_select_by_key.setString(1,symbol);
 			this._ps_select_by_key.setString(2,name);
+			this._ps_select_by_key.setInt(3,i_domain);
 			ResultSet rs=this._ps_select_by_key.executeQuery();
 			boolean ret=rs.next();
 			rs.close();
@@ -140,13 +148,15 @@ public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 			try {
 				this.symbol=rs.getString(1);
 				this.name=rs.getString(2);
-				this.url=rs.getString(3);
+				this.domain=rs.getInt(3);
+				this.url=rs.getString(4);
 			} catch (SQLException e) {
 				throw new SdbException(e);
 			}
 		}
 		public String symbol;
 		public String name;
+		public int domain;
 		public String url;
 	}
 	/*

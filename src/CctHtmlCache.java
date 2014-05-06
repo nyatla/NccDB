@@ -1,5 +1,7 @@
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Date;
 
@@ -20,6 +22,7 @@ import jp.nyatla.nccdb.table.IdPairTable;
 import jp.nyatla.nccdb.table.ServiceUrlTable;
 import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.BasicHttpClient;
@@ -30,83 +33,64 @@ public class CctHtmlCache
 {
 	
 	/**
-	 * CryptcoinTankからコイン情報スレッドを取り込む。
+	 * CryptcoinTankからコイン情報スレッドをキャッシュする。
+	 * キャッシュキーは"Symbol:Name:1"
 	 * @param ap
 	 * @param i_db
 	 * @throws SdbException
 	 */
-	private static void getInformationCoinThread(ArgHelper ap,SqliteDB i_db) throws SdbException
+	private static void getCryptocoinTalkHtmlCache(NccDBAppArgHelper ap) throws SdbException
 	{
 		Logger.log("Start getInformationCoinThread");
+		SqliteDB cache_db=ap.getHtmlCache();
+		SqliteDB db=ap.getNccDB();		
 		CoinMasterTable ctt=null;
+		String ua=ap.getString("-ua",null);
+		String cookie=ap.getString("-cookie",null);
+		
 		//URLリストの構築
-		String[] url_list=UrlData.CC_URL_LIST;
-		{
-			String l=ap.getString("url", null);
-			if(l!=null){
-				url_list=l.split(",");
-			}
-		}
+
 		long today=(new Date()).getTime();
 		//tableオープン
-		HtmlCacheTable hct=new HtmlCacheTable(i_db,HtmlCacheTable.NAME);
-		i_db.beginTransaction();
+		HtmlCacheTable hct=new HtmlCacheTable(cache_db,HtmlCacheTable.NAME);
+		CoinSourceUrlTable csu=new CoinSourceUrlTable(cache_db,CoinSourceUrlTable.NAME);
+
+		db.beginTransaction();
 		try{
-			String ua=ap.getString("-ua",null);
-			String cookie=ap.getString("-cookie",null);
-			CryptCoinTankCoinListScraper scp=new CryptCoinTankCoinListScraper(ua,cookie);
+			BasicHttpClient httpcl=new BasicHttpClient();
+			httpcl.setSession(ua, cookie);
+			
+			RowIterable<CoinSourceUrlTable.Item> b=csu.getAll();
 			//CoinListの取得
-			for(int i2=0;i2<url_list.length;i2++){
-				Logger.log("Scan URL="+url_list[i2]);
-				ArrayList<CryptCoinTankCoinListScraper.Item> items=scp.parse(url_list[i2]);
-				if(items==null){
-					throw new SdbException();
+			for(CoinSourceUrlTable.Item i:b){
+				if(i.symbol==null || i.name==null || i.symbol.charAt(0)=='*'){
+					Logger.log("[IGNORE]");
+					continue;
 				}
-				//テーブルを追記
-				BasicHttpClient httpcl=new BasicHttpClient();
-				httpcl.setSession(ua,cookie);
-				for(CryptCoinTankCoinListScraper.Item i:items){
-					//既にデータベースにあるコインコードなら無視
-					if(hct.isExist(i.symbol+":"+i.name))
-					{
-						Logger.log("[EXIST]"+i.symbol+":"+i.name);
-						continue;
-					}
-					//
-					Document d=httpcl.httpGet(i.href);
-					//Information Threadを探す
-					Element el_content=d.getElementById("forum_table");
-					Elements el_tds=el_content.select("h4 a");
-					boolean found=false;
-					for(int i3=0;i3<el_tds.size();i3++){
-						String s=el_tds.get(i3).text();
-						String h=el_tds.get(i3).attr("href");
-						//入れ子リストは無視
-						if(!s.trim().matches(".+Information( .+)?$")){
-							continue;
-						}
-						//コインページの→HTMLを得る
-						d=httpcl.httpGet(h);
-						//保存
-						boolean is_cct=hct.add(today,i.symbol+":"+i.name,d.toString());
-						Logger.log("["+(is_cct?"ADD":"DROP")+"]"+i.symbol+":"+i.name);
-						found=true;
-						//ちょっと待つ
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e){
-							throw new SdbException(e);
-						}
-						break;
-					}
-					if(!found){
-						Logger.log("[ERROR]"+i.symbol+":"+i.name+"is not found!");
-					}
+				String key_text=i.symbol+":"+i.name+":"+i.domain;
+				if(hct.isExist(key_text))
+				{
+					Logger.log("[EXIST]"+key_text);
+					continue;
+				}
+				Document d=httpcl.httpGet(i.url);
+				if(d==null){
+					Logger.log("[ERROR]"+key_text+" "+i.url);
+					continue;
+				}
+				//保存
+				boolean is_cct=hct.add(today,key_text,d.toString());
+				Logger.log("["+(is_cct?"ADD":"DROP")+"]"+key_text);
+				//ちょっと待つ
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e){
+					throw new SdbException(e);
 				}
 			}
-			i_db.commit();			
+			db.commit();			
 		}finally{
-			i_db.endTransaction();			
+			db.endTransaction();			
 			if(ctt!=null){
 				ctt.dispose();
 			}
@@ -262,7 +246,13 @@ public class CctHtmlCache
 			return "Unknown";
 		}
 	}
-	private static void extractCoinUrl(NccDBAppArgHelper ap) throws SdbException
+	/**
+	 * コマンド関数。HtmlCacheTableに格納される全てのHTMLを解析し、キーのSymbol:Nameに従ってコインのサービスURLを登録する。
+	 * 
+	 * @param ap
+	 * @throws SdbException
+	 */
+	private static void importUrls(NccDBAppArgHelper ap) throws SdbException
 	{
 		Logger.log("Start extractCoinUrl");
 		CoinMasterTable ctt=null;
@@ -270,7 +260,7 @@ public class CctHtmlCache
 		SqliteDB cache_db=ap.getHtmlCache();
 		SqliteDB db=ap.getNccDB();
 		HtmlCacheTable hct=new HtmlCacheTable(cache_db,HtmlCacheTable.NAME);
-		HtmlCacheTable.RowIterable rows=hct.getAll();
+		RowIterable<HtmlCacheTable.Item> rows=hct.getAll();
 		CoinMasterTable coin_master=new CoinMasterTable(db);
 		ServiceUrlTable service_url=new ServiceUrlTable(db);
 		CoinUrlIdPairTable id_pair=new CoinUrlIdPairTable(db);
@@ -278,10 +268,17 @@ public class CctHtmlCache
 			db.beginTransaction();
 			//全行取得
 			for(HtmlCacheTable.Item row : rows){
-				//HTMLを解析してURLリストを生成
-				CctThreadLinkList pbl=new CctThreadLinkList(Jsoup.parse(row.html));
 				//コインシンボル、コイン名を取得
 				String[] k=row.key.split(":");
+				
+				//HTMLを解析してURLリストを生成
+				ArrayList<String[]> pbl;
+				if(k.length==2 || Integer.parseInt(k[2])==CoinSourceUrlTable.DOMAIN_CCT){
+					//CCTドメインの場合
+					pbl=new CctThreadLinkList(Jsoup.parse(row.html));
+				}else{
+					continue;
+				}
 
 				//コインを選択
 				CoinMasterTable.Item coin=coin_master.getItem(k[0],k[1]);
@@ -290,6 +287,7 @@ public class CctHtmlCache
 					Logger.log(String.format("[ERROR]%s:%s:coin not found",k[0],k[1]));
 					continue;
 				}
+				//登録
 				for(String[] s:pbl){
 					String url=s[2];
 					int url_type=ServiceTypeTable.getSingleton().getId(s[0]);
@@ -332,7 +330,7 @@ public class CctHtmlCache
 		//URLリストの構築
 		String[] url_list=UrlData.CC_URL_LIST;
 		{
-			String l=ap.getString("url", null);
+			String l=ap.getString("-url", null);
 			if(l!=null){
 				url_list=l.split(",");
 			}
@@ -355,33 +353,40 @@ public class CctHtmlCache
 				//テーブルを追記
 				BasicHttpClient httpcl=new BasicHttpClient();
 				httpcl.setSession(ua,cookie);
-				for(CryptCoinTankCoinListScraper.Item i:items){
+				L1:for(CryptCoinTankCoinListScraper.Item i:items){
 					//既にデータベースにあるコインコードなら無視
-					if(csu.isExist(i.symbol,i.name))
+					if(csu.isExist(i.symbol,i.name,CoinSourceUrlTable.DOMAIN_CCT))
 					{
 						Logger.log("[EXIST]"+i.symbol+":"+i.name);
 						continue;
 					}
 					//
 					Document d=httpcl.httpGet(i.href);
+					if(d==null){
+						Logger.log("ERROR:"+i.href);
+					}					
+					try {
+						Thread.sleep(500);
+					} catch (InterruptedException e){
+					}
 					//Information Threadを探す
 					Element el_content=d.getElementById("forum_table");
 					Elements el_tds=el_content.select("h4 a");
-					L1: for(int i3=0;i3<el_tds.size();i3++){
+					for(int i3=0;i3<el_tds.size();i3++){
 						String s=el_tds.get(i3).text();
 						String h=el_tds.get(i3).attr("href");
 						//入れ子リストは無視
 						if(!s.trim().matches(".+Information( .+)?$")){
 							continue;
 						}
-						if(csu.add(i.symbol,i.name,h)){
+						if(csu.add(i.symbol,i.name,CoinSourceUrlTable.DOMAIN_CCT,h)){
 							Logger.log("[ADD]"+i.symbol+":"+i.name);
 						}else{
 							Logger.log("[ERROR]"+i.symbol+":"+i.name);
 						}
 						continue L1;
 					}
-					if(csu.add(i.symbol,i.name,null)){
+					if(csu.add(i.symbol,i.name,CoinSourceUrlTable.DOMAIN_CCT,null)){
 						Logger.log("[PARTIAL]"+i.symbol+":"+i.name);
 					}else{
 						Logger.log("[ERROR]"+i.symbol+":"+i.name);
@@ -400,13 +405,23 @@ public class CctHtmlCache
 		}
 		Logger.log("done.");
 	}
-
+	public static String encodePath(String i_cct_path) throws SdbException
+	{
+		int p=i_cct_path.indexOf("/topic/");
+		String ret;
+		try {
+			ret = i_cct_path.substring(0,p)+"/topic/"+URLEncoder.encode(i_cct_path.substring(p+7,i_cct_path.length()-1),"UTF-8")+"/";
+		} catch (UnsupportedEncodingException e) {
+			throw new SdbException(e);
+		}
+		return ret;
+	}
 	private static void scrapeFromCctThread(ArgHelper ap,SqliteDB i_db) throws SdbException
 	{
 		Logger.log("Start name,symbol,url scraping from CryptocoinTalk Coin thread");
 		CoinMasterTable ctt=null;
 		//URLリストの構築
-		String target_url=ap.getString("url",UrlData.CC_ANNOUNCEMENT_URL);
+		String target_url=ap.getString("-url",UrlData.CC_ANNOUNCEMENT_URL);
 
 		//?prune_day=100&sort_by=Z-A&sort_key=last_post&topicfilter=all
 		CoinSourceUrlTable csu=new CoinSourceUrlTable(i_db,CoinSourceUrlTable.NAME);
@@ -431,7 +446,9 @@ public class CctHtmlCache
 						Logger.log("[EXIST]"+items.get(i3).href);
 						continue;
 					}
-					if(csu.add(items.get(i3).href)){
+//					String encoded_href=encodePath(items.get(i3).href);
+//					if(csu.add(CoinSourceUrlTable.DOMAIN_CCT,encoded_href)){
+					if(csu.add(CoinSourceUrlTable.DOMAIN_CCT,items.get(i3).href)){
 						Logger.log("[ADD]"+items.get(i3).href);
 						number_of_add++;
 					}else{
@@ -454,35 +471,50 @@ public class CctHtmlCache
 		}
 		Logger.log("done.");
 	}
+
 	/**
 	 * SourceURLからCoinMasterへ存在しないコインをインポートする。
 	 * @param ap
 	 * @param i_db
 	 * @throws SdbException
 	 */
-	private static void importCoinList(ArgHelper ap,SqliteDB i_db) throws SdbException
+	private static void importCoinList(NccDBAppArgHelper ap) throws SdbException
 	{
 		Logger.log("Start syncryptCoinList");
 		CoinMasterTable ctt=null;
 		CoinSourceUrlTable csu=null;
+		SqliteDB cache_db=ap.getHtmlCache();
+		SqliteDB ncc_db=ap.getNccDB();
 		//tableオープン
-		i_db.beginTransaction();
+		ncc_db.beginTransaction();
+		int num_of_add=0;
 		try{
-			ctt=new CoinMasterTable(i_db);
-			csu=new CoinSourceUrlTable(i_db,CoinSourceUrlTable.NAME);
-			//nullスペックのidを取得
-			CoinSourceUrlTable.Item csti=csu.getAll();
-			for(;;){
-				if(ctt.isExist("symbol","name")){
+			ctt=new CoinMasterTable(ncc_db);
+			csu=new CoinSourceUrlTable(cache_db,CoinSourceUrlTable.NAME);
+			//元データを全行取得
+			RowIterable<CoinSourceUrlTable.Item> csti=csu.getAll();
+			for (CoinSourceUrlTable.Item i:csti)
+			{
+				if(i.symbol==null || i.name==null || i.symbol.charAt(0)=='*'){
+					Logger.log("[IGNORE]");
+					continue;
+				}
+				CoinMasterTable.Item it=ctt.getItem(i.symbol,i.name);
+				if(it!=null){
 					Logger.log("[EXISTS]"+i.symbol+":"+i.name);
 					continue;
 				}
 				//add
-				Logger.log("[ADD]"+i.symbol+":"+i.name);
+				if(ctt.add(i.symbol, i.name,null,null,null)){
+					Logger.log("[ADD]"+i.symbol+":"+i.name+" "+i.url);
+				}else{
+					Logger.log("[ERROR]"+i.symbol+":"+i.name);
+				}
+				num_of_add++;
 			}
-			i_db.commit();			
+			ncc_db.commit();			
 		}finally{
-			i_db.endTransaction();			
+			ncc_db.endTransaction();			
 			if(ctt!=null){
 				ctt.dispose();
 			}
@@ -490,7 +522,7 @@ public class CctHtmlCache
 				csu.dispose();
 			}
 		}
-		Logger.log("done.");
+		Logger.log(num_of_add+" data add.\ndone.");
 		
 	}	
 	public static String readme()
@@ -498,9 +530,15 @@ public class CctHtmlCache
 		return
 			CoinListCsvIo.class.getName()+"\n"+
 			"-cmd cct_html_cache [-cct_db CCTDB] [-u UA] [-url COIN_LIST_URL] [-cookie COOKIE]\n"+
-			"-cmd cct_import_urls [-cct_db DB] [-csv CSV]\n"+
+			" CCTDBコインシンボルテーブルから有効なURLのみをキャッシュします。"+
+			"-cmd cct_import_urls [-cct_db CCTDB] [-cct_db DB] [-csv CSV]\n"+
+			"　CCTDBのHTMLキャッシュからURLを抽出してコイン名と共にNccDBへ登録します。\n"+
+			"-cmd cct_import_coinlist [-cct_db DB]  [-db DB]"+
+			" CCTDBのコインシンボルテーブルからコイン名とシンボルをNccDBへ登録します。\n"+
 			"-cmd cct_scrape_url_from_list_thread [-cct_db CCTDB] [-u UA] [-url CCT_COIN_LIST_URL] [-cookie COOKIE]\n"+
+			"　CryptoCoinTankのCoinListスレッド(s)を巡回してURLとコイン名をCCTDBのコインシンボルテーブルへ登録します。\n"+
 			"-cmd cct_scrape_url_from_thread [-cct_db CCTDB] [-u UA] [-url CCT_THREAD_URL] [-cookie COOKIE]\n"+
+			"　CryptoCoinTankのスレッドを日付順で巡回してURLをCCTDBのコインシンボルテーブルへ登録します。\n"+
 			"	DB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_NCCDB_DB_PATH+"\n"+
 			"	CCTDB - sqlite3 file name. default="+NccDBAppArgHelper.ENV_HTML_CACHE_DB_PATH+"\n"+
 			"	UA - HTTPリクエストのユーザエージェント\n"+
@@ -511,16 +549,18 @@ public class CctHtmlCache
 	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
 		if(i_cmd.compareTo("cct_html_cache")==0){
-			//スレッドからHTMLをキャッシュ
-			getInformationCoinThread(args,args.getHtmlCache());
+			//スレッドからHTMLをCCT DBへキャッシュ
+			getCryptocoinTalkHtmlCache(args);
 		}else if(i_cmd.compareTo("cct_import_urls")==0){
-			//HTMLからコインペアへサービスURLリストをインポート
-			extractCoinUrl(args);
+			//HTMLキャッシュからコインペアへサービスURLリストをCCT DBへインポート
+			importUrls(args);
+		}else if(i_cmd.compareTo("cct_import_coinlist")==0){
+			importCoinList(args);
 		}else if(i_cmd.compareTo("cct_scrape_url_from_list_thread")==0){
 			//コインリストからコインソースURLテーブルへデータをスクレイプ
 			scrapeFromCoinList(args,args.getHtmlCache());
 		}else if(i_cmd.compareTo("cct_scrape_url_from_thread")==0){
-			//CryptocoinTalkのスレッドからURLリストをインポート
+			//CryptCoinTankスレッドからURLをスクレイピング
 			scrapeFromCctThread(args,args.getHtmlCache());
 		}else{
 			return false;

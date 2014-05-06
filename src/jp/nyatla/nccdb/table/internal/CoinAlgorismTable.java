@@ -9,11 +9,17 @@ public final class CoinAlgorismTable extends InternalNameTable
 	public final static int SHA256D	=1;
 	public final static int SCRYPT	=2;
 	public final static int QUARK	=3;
+	public final static int SCRYPT_N=4;
+	public final static int SHA3	=5;
+	public final static int X11		=6;
 	private final static String[] _table={
 		"UNKNOWN",
 		"SHA256D",
 		"SCRYPT",
-		"QUARK"		
+		"QUARK",
+		"SCRYPT-N",
+		"SHA3",
+		"X11"
 	};
 	private final static CoinAlgorismTable _single=new CoinAlgorismTable();
 	public static CoinAlgorismTable getSingleton()

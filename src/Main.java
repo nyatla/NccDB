@@ -1,15 +1,15 @@
 
 
-import jp.nyatla.nyansat.db.basic.SqliteDB;
-import jp.nyatla.nyansat.utils.ArgHelper;
+
 import jp.nyatla.nyansat.utils.SdbException;
 
 
 public class Main
 {
-	public static final String VERSION="1.3.1";	
+	public static final String VERSION="1.4.5";	
 	public static void main(String[] args)
 	{
+		System.setProperty("file.encoding","UTF-8");
 		try{
 			NccDBAppArgHelper a=new NccDBAppArgHelper(args);			
 			String c=a.getString("-cmd",null);
@@ -20,6 +20,7 @@ public class Main
 			}else if(UrlListCsvIo.run(c,a)){
 			}else if(ServiceCoinCsvIo.run(c,a)){
 			}else if(CctHtmlCache.run(c, a)){
+			}else if(ImageListImport.run(c, a)){
 			}else{
 				throw new Exception("Bad -cmd");
 			}
