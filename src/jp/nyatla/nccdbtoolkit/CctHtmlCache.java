@@ -1,4 +1,5 @@
 package jp.nyatla.nccdbtoolkit;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -11,6 +12,8 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
+
+
 
 import jp.nyatla.nccdb.CryptCoinTankCoinListScraper;
 import jp.nyatla.nccdb.CryptCoinTankCoinListScraper.Item;

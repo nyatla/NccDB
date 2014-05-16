@@ -1,4 +1,6 @@
 package jp.nyatla.nccdbtoolkit;
+
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -340,7 +342,7 @@ public class BctHtmlCache
 	}
 	private static void scrapeFromBctThread(ArgHelper ap,SqliteDB i_db) throws SdbException
 	{
-		Logger.log("Start name,symbol,url scraping from CryptocoinTalk Coin thread");
+		Logger.log("Start name,symbol,url scraping from BitcoinTalk Coin thread");
 		CoinMasterTable ctt=null;
 		//URLリストの構築
 		String target_url=ap.getString("-url",UrlData.BC_URL_LIST);

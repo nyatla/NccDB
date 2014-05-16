@@ -1,4 +1,5 @@
 package jp.nyatla.nccdbtoolkit;
+
 import java.io.IOException;
 
 import jp.nyatla.nccdb.table.*;
