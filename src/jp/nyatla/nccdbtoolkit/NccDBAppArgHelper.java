@@ -1,3 +1,4 @@
+package jp.nyatla.nccdbtoolkit;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
 import jp.nyatla.nyansat.utils.SdbException;

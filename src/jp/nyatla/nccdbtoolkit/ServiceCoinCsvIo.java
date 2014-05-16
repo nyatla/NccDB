@@ -1,3 +1,4 @@
+package jp.nyatla.nccdbtoolkit;
 
 import jp.nyatla.nccdb.table.CoinMasterTable;
 import jp.nyatla.nccdb.table.CoinUrlIdPairTable;

@@ -1,3 +1,4 @@
+package jp.nyatla.nccdbtoolkit;
 
 public class Logger
 {

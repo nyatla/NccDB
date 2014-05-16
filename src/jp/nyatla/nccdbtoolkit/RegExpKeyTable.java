@@ -1,3 +1,4 @@
+package jp.nyatla.nccdbtoolkit;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
