@@ -240,12 +240,14 @@ public class CoinListCsvIo
 		CoinSpecTable cst=null;
 		CoinInfoView civ=null;
 		ServiceUrlTable cut=null;
+		CoinUrlIdPairTable cuidp=null;
 		//tableオープン
 		try{
 			ctt=new CoinMasterTable(db);
 			cst=new CoinSpecTable(db);
 			civ=new CoinInfoView(db);
 			cut=new ServiceUrlTable(db);
+			cuidp=new CoinUrlIdPairTable(db);
 		}finally{
 			if(ctt!=null){
 				ctt.dispose();
@@ -258,6 +260,9 @@ public class CoinListCsvIo
 			}
 			if(cut!=null){
 				cut.dispose();
+			}
+			if(cuidp!=null){
+				cuidp.dispose();
 			}
 		}
 		Logger.log("done.");
@@ -331,15 +336,15 @@ public class CoinListCsvIo
 						del++;
 						nor++;
 						//Alias idにリンクした項目を削除
-						if(!cpair.delete(p.id1,p.id2)){
-							Logger.log(String.format("Error! Delete id=%d:%d",p.id1,p.id2));
+						if(!cpair.delete(p.coin_id,p.url_id,p.url_type)){
+							Logger.log(String.format("Error! Delete id=%d:%d:%d",p.coin_id,p.url_id,p.url_type));
 							throw new SdbException();
 						}
 						//aliasのroot-idとurl_idで検索して同盟のがある？
-						if(!cpair.isExistItem(root_id,p.id2)){
+						if(!cpair.isExistItem(root_id,p.url_id,p.url_type)){
 							//ルートidとURLIDペアが無い場合は追加
-							if(!cpair.add(root_id,p.id2)){
-								Logger.log(String.format("Error! Add id=%d:%d",root_id,p.id2));
+							if(!cpair.add(root_id,p.url_id,p.url_type)){
+								Logger.log(String.format("Error! Add id=%d:%d:%d",root_id,p.url_id,p.url_type));
 								throw new SdbException();
 							}
 						}

@@ -1,7 +1,5 @@
 package jp.nyatla.nccdbtoolkit;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -147,21 +145,20 @@ public class CctHtmlCache
 					String url=s[2];
 					int url_type=ServiceTypeTable.getSingleton().getId(s[0]);
 					//URLをキーに選択してnameを取得
-					ServiceUrlTable.Item url_item=service_url.getItemByUrlType(url,url_type);
+					ServiceUrlTable.Item url_item=service_url.getItemByUrl(url);
 					//URLをignore existで追加
 					boolean is_add_url=service_url.update(
 						url_item==null?s[1]:url_item.name,	//name
-						url_type,	//id_type
 						0,		//status
 						s[2],	//url
 						null);	//description
 					//URLを選択しなおす。
-					ServiceUrlTable.Item selected_url=service_url.getItemByUrlType(s[2],url_type);
+					ServiceUrlTable.Item selected_url=service_url.getItemByUrl(s[2]);
 					if(selected_url==null){
 						throw new SdbException();
 					}
 					//コインID/URLを追加
-					boolean is_add_id_pair=id_pair.add(coin.id,selected_url.id);
+					boolean is_add_id_pair=id_pair.add(coin.id,selected_url.id,url_type);
 					//ログ
 					Logger.log(String.format("[OK]%s:%s:url=%s,id_pair=%s",row.symbol,row.name,is_add_url?"update":"error",is_add_id_pair?"add":"exist"));
 				}

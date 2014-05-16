@@ -65,7 +65,6 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select;
 	private PreparedStatement _ps_select_id1;
-	private PreparedStatement _ps_select_distinct_id2;
 	public IdPairTable(SqliteDB i_db,String i_table_name,String i_id1,String i_id2) throws SdbException
 	{
 		super(i_db,new IdPairTableInfo(i_table_name,i_id1,i_id2));

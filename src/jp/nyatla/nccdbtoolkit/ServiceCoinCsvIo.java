@@ -54,9 +54,8 @@ public class ServiceCoinCsvIo
 			//3行目のインデクスを得る。
 			//サービスIDを検索
 			ServiceUrlTable.Item[] url_item=new ServiceUrlTable.Item[number_of_service];
+			int[] url_type=new int[number_of_service];
 			{
-				String[] url=new String[number_of_service];
-				int[] url_type=new int[number_of_service];
 				//1行目は読み飛ばし
 				for(int i=0;i<number_of_service;i++){
 					
@@ -69,12 +68,9 @@ public class ServiceCoinCsvIo
 				csv.next();
 				//3行目
 				for(int i=0;i<number_of_service;i++){
-					url[i]=csv.getString(service_name_idx+i);
-				}
-				
-				//URLテーブルからURL/TYPEキーでデータを取得
-				for(int i=0;i<number_of_service;i++){
-					url_item[i]=coin_url.getItemByUrlType(url[i],url_type[i]);
+					String url=csv.getString(service_name_idx+i);
+					//URLテーブルからURL/TYPEキーでデータを取得
+					url_item[i]=coin_url.getItemByUrl(url);
 					if(url_item[i]==null){
 						throw new SdbException();
 					}
@@ -92,19 +88,19 @@ public class ServiceCoinCsvIo
 				//コインが見つかったらurl-id
 				for(int i=0;i<number_of_service;i++){
 					//サービスIDとコインIDのペアを検索
-					CoinUrlIdPairTable.Item pair=coin_url_pair.getItem(coin.id,url_item[i].id);
+					CoinUrlIdPairTable.Item pair=coin_url_pair.getItem(coin.id,url_item[i].id,url_type[i]);
 					//表の値を評価
 					if(csv.getString(service_name_idx+i).matches("[yY]")){
 						l+="Y";
 						//有効値の場合
 						if(pair==null){
-							coin_url_pair.add(coin.id,url_item[i].id);
+							coin_url_pair.add(coin.id,url_item[i].id,url_type[i]);
 						}			
 					}else{
 						l+="-";
 						//無効値の場合
 						if(pair!=null){
-							coin_url_pair.delete(coin.id,url_item[i].id);
+							coin_url_pair.delete(coin.id,url_item[i].id,url_type[i]);
 						}
 					}
 				}
@@ -148,6 +144,7 @@ public class ServiceCoinCsvIo
 			writer.writeCol(CoinMasterTable.DN_symbol);
 			writer.writeCol(CoinMasterTable.DN_name);
 			ServiceUrlTable.Item[] url_item=new ServiceUrlTable.Item[service_names.length];
+			int[] url_type=new int[service_names.length];
 			//列行の書き出し
 			{
 				//情報取得と1行目の書き出し
@@ -159,9 +156,9 @@ public class ServiceCoinCsvIo
 					}
 					
 					//サービス情報を得る。
-					url_item[i]=coin_url.getItemByUrlType(
-							service_names[i].substring(sp+1),
-							ServiceTypeTable.getSingleton().getId(service_names[i].substring(0,sp)));
+					url_item[i]=coin_url.getItemByUrl(
+							service_names[i].substring(sp+1));
+					url_type[i]=ServiceTypeTable.getSingleton().getId(service_names[i].substring(0,sp));
 					if(url_item[i]==null){
 						throw new SdbException();
 					}
@@ -172,7 +169,8 @@ public class ServiceCoinCsvIo
 				writer.writeCol("");
 				writer.writeCol("");
 				for(int i=0;i<service_names.length;i++){
-					writer.writeCol(ServiceTypeTable.getSingleton().getString(url_item[i].id_coin_url_type));
+					writer.writeCol(
+						ServiceTypeTable.getSingleton().getString(url_type[i]));
 				}
 				writer.next();
 				//3行目
@@ -191,9 +189,9 @@ public class ServiceCoinCsvIo
 				row[1]=ci.coin_name;
 				//コインペアを検索
 				String l="";
-				for(int i=0;i<url_item.length;i++){
+				for(int i=0;i<service_names.length;i++){
 					//サービスIDとコインIDのペアを検索
-					CoinUrlIdPairTable.Item pair=coin_url_pair.getItem(ci.id,url_item[i].id);
+					CoinUrlIdPairTable.Item pair=coin_url_pair.getItem(ci.id,url_item[i].id,url_type[i]);
 					row[2+i]=pair!=null?"Y":"--";
 					l+=pair!=null?"Y":"-";
 				}

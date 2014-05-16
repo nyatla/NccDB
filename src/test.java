@@ -73,7 +73,7 @@ public class test {
 		String[] t16={
 				"-cmd","reflesh"
 		};
-		String[] test=t14;
+		String[] test=t16;
 		Main.main(test);
 /*		
 		try {

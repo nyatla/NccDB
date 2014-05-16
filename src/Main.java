@@ -13,7 +13,7 @@ import jp.nyatla.nyansat.utils.SdbException;
 
 public class Main
 {
-	public static final String VERSION="1.4.41";	
+	public static final String VERSION="1.4.50";	
 	public static void main(String[] args)
 	{
 		System.setProperty("file.encoding","UTF-8");
@@ -32,7 +32,7 @@ public class Main
 			}else{
 				throw new Exception("Bad -cmd");
 			}
-		}catch(Throwable e){
+		}catch(Exception e){
 			System.out.println("nccdb - NyatlaCryptCoinDatabase version "+VERSION);
 			System.out.println(CoinListCsvIo.readme());
 			System.out.println(UrlListCsvIo.readme());

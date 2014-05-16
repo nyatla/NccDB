@@ -39,18 +39,16 @@ public class UrlListCsvIo
 			CsvReader csv=new CsvReader(path);
 			//列インデックスを得る。	
 			int name_idx		=csv.getIndex(ServiceUrlTable.DN_name);
-			int url_type_idx	=csv.getIndex(ServiceUrlTable.DN_id_coin_url_type);
 			int url_status_idx	=csv.getIndex(ServiceUrlTable.DN_id_coin_url_status);
 			int url_idx			=csv.getIndex(ServiceUrlTable.DN_url);
 			int description_idx	=csv.getIndex(ServiceUrlTable.DN_description);
 			while(csv.next()){
 				String name=csv.getString(name_idx);
-				int type_idx=ServiceTypeTable.getSingleton().getId(csv.getString(url_type_idx));
 				int url_status=csv.getInteger(url_status_idx);
 				String url=csv.getString(url_idx);
 				String description=csv.getString(description_idx);
 				//Titleを追加
-				if(!coin_url.update(name,type_idx,url_status,url,description))
+				if(!coin_url.update(name,url_status,url,description))
 				{
 					throw new SdbException();
 				}
