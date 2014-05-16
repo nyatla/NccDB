@@ -10,23 +10,19 @@ import java.util.Date;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 
 
 
 import jp.nyatla.nccdb.CryptCoinTankCoinListScraper;
-import jp.nyatla.nccdb.CryptCoinTankCoinListScraper.Item;
 import jp.nyatla.nccdb.table.CoinBaseHtmlCacheView;
 import jp.nyatla.nccdb.table.CoinMasterTable;
 import jp.nyatla.nccdb.table.CoinSourceUrlTable;
-import jp.nyatla.nccdb.table.CoinSpecTable;
 import jp.nyatla.nccdb.table.CoinUrlIdPairTable;
 import jp.nyatla.nccdb.table.HtmlCacheTable;
-import jp.nyatla.nccdb.table.IdPairTable;
 import jp.nyatla.nccdb.table.ServiceUrlTable;
-import jp.nyatla.nccdb.table.internal.CoinAlgorismTable;
 import jp.nyatla.nccdb.table.internal.ServiceTypeTable;
+import jp.nyatla.nccdbtoolkit.urlparser.CctUrlPickup;
 import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.utils.ArgHelper;
@@ -134,7 +130,7 @@ public class CctHtmlCache
 				ArrayList<String[]> pbl;
 				if(row.domain==CoinSourceUrlTable.DOMAIN_CCT){
 					//CCTドメインの場合
-					pbl=new CctLinkListParser(Jsoup.parse(row.html));
+					pbl=new CctUrlPickup(Jsoup.parse(row.html));
 				}else{
 					continue;
 				}
