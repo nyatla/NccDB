@@ -66,6 +66,13 @@ public class test {
 				"-imgsrc","D:\\db\\nccdb\\img",
 				"-imgdst","D:\\public_html\\ccsatoshi\\web\\cimg"
 		};		
+		String[] t15={
+			"-cmd","bct_scrape_url_from_thread",
+			"-url","https://bitcointalk.org/index.php?board=159"
+		};
+		String[] t16={
+				"-cmd","reflesh"
+		};
 		String[] test=t14;
 		Main.main(test);
 /*		

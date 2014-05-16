@@ -22,27 +22,27 @@ import jp.nyatla.nyansat.utils.SdbException;
 public class HtmlCacheTable extends BaseTable<HtmlCacheTable.Item>
 {
 	public final static String NAME="cct_cache";
+	public final static String DN_date="date";
+	public final static String DN_url="url";
+	public final static String DN_html="html";
 
 	private static class HtmlCacheTableInfo extends BasicTableDefinition<Item>
 	{
-		private final static String id_date="date";
-		private final static String id_key="key";
-		private final static String id_html="html";
 		public HtmlCacheTableInfo(String i_table_name)
 		{
 			super(i_table_name);
 		}
 		@Override
 		public String[] getElementNames() {
-			return new String[]{id_date,id_key,id_html};
+			return new String[]{DN_date,DN_url,DN_html};
 		}
 		@Override
 		public String getCreateStr(){
 			return "("+
-				id_date+" integer,"+
-				id_key+" text,"+
-				id_html+" text,"+
-				"unique("+id_key+"))";
+				DN_date+" integer,"+
+				DN_url+" text,"+
+				DN_html+" text,"+
+				"unique("+DN_url+"))";
 		}
 		@Override
 		public Item createRowItem(ResultSet rs) throws SdbException {
@@ -79,12 +79,12 @@ public class HtmlCacheTable extends BaseTable<HtmlCacheTable.Item>
 			throw new SdbException(e);
 		}
 	}
-	public boolean add(long i_date,String i_id1,String i_id2) throws SdbException
+	public boolean add(long i_date,String i_url,String i_html) throws SdbException
 	{
 		try {
 			this._ps_insert.setLong(1,i_date);
-			this._ps_insert.setString(2,i_id1);
-			this._ps_insert.setString(3,i_id2);
+			this._ps_insert.setString(2,i_url);
+			this._ps_insert.setString(3,i_html);
 			this._ps_insert.execute();
 			return this._ps_insert.getUpdateCount()>0;
 		} catch (SQLException e) {
@@ -143,14 +143,14 @@ public class HtmlCacheTable extends BaseTable<HtmlCacheTable.Item>
 		{
 			try{
 				this.date=rs.getLong(1);
-				this.key=rs.getString(2);
+				this.url=rs.getString(2);
 				this.html=rs.getString(3);
 			}catch(SQLException e){
 				throw new SdbException(e);
 			}
 		}
 		public long date;
-		public String key;
+		public String url;
 		public String html;
 	}
 	/*

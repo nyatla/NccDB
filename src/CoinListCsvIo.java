@@ -229,19 +229,20 @@ public class CoinListCsvIo
 		Logger.log("done.");
 		
 	}
-	public static void initDB(ArgHelper ap,SqliteDB i_db) throws SdbException
+	public static void initDB(NccDBAppArgHelper ap) throws SdbException
 	{
 		Logger.log("Setup table and view of database.");
+		SqliteDB db=ap.getNccDB();
 		CoinMasterTable ctt=null;
 		CoinSpecTable cst=null;
 		CoinInfoView civ=null;
 		ServiceUrlTable cut=null;
 		//tableオープン
 		try{
-			ctt=new CoinMasterTable(i_db);
-			cst=new CoinSpecTable(i_db);
-			civ=new CoinInfoView(i_db);
-			cut=new ServiceUrlTable(i_db);
+			ctt=new CoinMasterTable(db);
+			cst=new CoinSpecTable(db);
+			civ=new CoinInfoView(db);
+			cut=new ServiceUrlTable(db);
 		}finally{
 			if(ctt!=null){
 				ctt.dispose();
@@ -259,6 +260,118 @@ public class CoinListCsvIo
 		Logger.log("done.");
 	}
 	
+	public static void refleshDB(NccDBAppArgHelper ap) throws SdbException
+	{
+		SqliteDB db=ap.getNccDB();
+		CoinMasterTable cmt=new CoinMasterTable(db);
+		CoinSpecTable cst=new CoinSpecTable(db);
+		CoinUrlIdPairTable cpair=new CoinUrlIdPairTable(db);
+		db.beginTransaction();
+		try{
+			//コインIDの多重エイリアスを解決
+			{
+				Logger.log("Reflesh alias_id");
+				int nor=0;
+				//alias_idのあるものを選択
+				RowIterable<CoinMasterTable.Item> m=cmt.getAliasItems();
+				for(CoinMasterTable.Item i :m){
+					CoinMasterTable.Item bi=cmt.getRootItemByAlias(i.alias_id);
+					if(bi==null){
+						//アカン
+						Logger.log(String.format("Error: id=%d has not root ID.",i.alias_id));
+						throw new SdbException();
+					}
+					//IDの更新
+					if((int)i.alias_id!=(int)bi.id){
+						Logger.log(String.format("Update %s:%s alias_id %d->%d [%s]",i.coin_symbol,i.coin_name,i.alias_id,bi.id,cmt.updateAliasId(i.coin_symbol,i.coin_name,bi.id)?"OK":"ERROR"));
+					}else{
+						Logger.log(String.format("Valid %s:%s",i.coin_symbol,i.coin_name));
+					}
+					nor++;
+				}
+				m.dispose();
+				Logger.log(String.format("%d data processed. done.",nor));
+			}
+			//コインスペックの未参照問題を解決
+			{
+				Logger.log("Reflesh spec_table.");
+				RowIterable<CoinSpecTable.Item> s=cst.getAll();
+				int nor=0;
+				for(CoinSpecTable.Item i :s){
+					
+					if(!cmt.isExistSpec(i.id)){
+						Logger.log(String.format("ID=%d has not reference ID. delete=%s",i.id,cst.deleteItem(i.id)?"OK":"NG"));
+					}
+					nor++;
+				}
+				s.dispose();
+				Logger.log(String.format("%d data processed. done.",nor));
+			}
+			//URLのALIASID問題を解消
+			{
+				Logger.log("Reflesh url_pair alias_id problem.");
+				int nor=0;
+				//alias_idのあるものを選択
+				RowIterable<CoinMasterTable.Item> m=cmt.getAliasItems();
+				for(CoinMasterTable.Item i :m)
+				{
+					CoinMasterTable.Item bi=cmt.getRootItemByAlias(i.alias_id);
+					if(bi==null){
+						//処理できぬ
+						continue;
+					}
+					int root_id=bi.id;
+					//Alias_idを持ってるURL-Pair行を検索
+					RowIterable<CoinUrlIdPairTable.Item> pm=cpair.getItemsByCoinId(i.id);
+					int del=0;
+					for(CoinUrlIdPairTable.Item p:pm){
+						del++;
+						nor++;
+						//Alias idにリンクした項目を削除
+						if(!cpair.delete(p.id1,p.id2)){
+							Logger.log(String.format("Error! Delete id=%d:%d",p.id1,p.id2));
+							throw new SdbException();
+						}
+						//aliasのroot-idとurl_idで検索して同盟のがある？
+						if(!cpair.isExistItem(root_id,p.id2)){
+							//ルートidとURLIDペアが無い場合は追加
+							if(!cpair.add(root_id,p.id2)){
+								Logger.log(String.format("Error! Add id=%d:%d",root_id,p.id2));
+								throw new SdbException();
+							}
+						}
+					}
+					if(del>0){
+						Logger.log(String.format("Alias nesting is solved. %s:%s",i.coin_symbol,i.coin_name));
+					}
+				}
+				m.dispose();
+				Logger.log(String.format("%d data processed. done.",nor));			
+			}
+			//URLペアの未参照問題を解決(1:未参照コインID)
+			{
+				Logger.log("delete unreferenced coin_id in url_pair.");
+				int ret=cpair.deleteNoReferencedRowByCoinId();
+				Logger.log(String.format("%d data deleted. done.",ret));			
+				//省略
+			}
+			//URLペアの未参照問題を解決(2:未参照URL)
+			{
+				Logger.log("delete unreferenced url_id in uri_pair.");
+				int ret=cpair.deleteNoReferencedRowByUriId();
+				Logger.log(String.format("%d data deleted. done.",ret));			
+			}
+			//未参照のURLを削除
+			{
+				//省略
+			}
+			db.commit();
+		}finally{
+			db.endTransaction();
+		}
+	}
+	
+	
 	public static final String CSV_PATH="coinspec.csv";
 	
 	public static String readme()
@@ -272,18 +385,21 @@ public class CoinListCsvIo
 			"	CSV - CSV as CoinListCsv format filename. default="+CSV_PATH+"\n"+
 			"	UA - User agent parametor for http get.\n"+
 			"	URL - CSV style URL list of cryptocointalk.com thread. default=set of cryptocointalk.com thread.\n"+
-			"	COOKIE - Cookie parametor for http get.";
+			"	COOKIE - Cookie parametor for http get."+
+			"-cmd reflesh [-db DB]\n";
 	}
 	public static boolean run(String i_cmd,NccDBAppArgHelper args) throws SdbException
 	{
 		if(i_cmd.compareTo("init")==0){
-			initDB(args,args.getNccDB());
+			initDB(args);
 		}else if(i_cmd.compareTo("coin_addlist")==0){
 			syncryptCoinList(args,args.getNccDB());
 		}else if(i_cmd.compareTo("coin_exportcsv")==0){
 			exportCSV(args,args.getNccDB());
 		}else if(i_cmd.compareTo("coin_importcsv")==0){
 			importCSV(args,args.getNccDB());
+		}else if(i_cmd.compareTo("reflesh")==0){
+			refleshDB(args);
 		}else{
 			return false;
 		}

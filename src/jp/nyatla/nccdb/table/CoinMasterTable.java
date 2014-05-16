@@ -79,13 +79,16 @@ public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 	public void dispose() throws SdbException
 	{
 		try {
-			this._ps_search_symbol.close();
 			if(this._ps_update!=null){
 				this._ps_update.close();
 			}
 			if(this._ps_insert!=null){
 				this._ps_insert.close();
 			}
+			this._ps_search_symbol.close();
+			this._ps_select_all_alias.close();
+			this._ps_select_item_id.close();
+			this._ps_select_all_spec.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -96,6 +99,9 @@ public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 	private PreparedStatement _ps_update;
 	private PreparedStatement _ps_search_symbol;
 	private PreparedStatement _ps_select_all_asc;
+	private PreparedStatement _ps_select_all_alias;
+	private PreparedStatement _ps_select_item_id;
+	private PreparedStatement _ps_select_all_spec;
 	
 	public CoinMasterTable(SqliteDB i_db) throws SdbException
 	{
@@ -106,10 +112,16 @@ public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 		super(i_db,new TableDef(i_table_name));
 		try{
 			String table_name=this._table_info.getTableName();
-			this._ps_search_symbol=this._db.getConnection().prepareStatement("select * from "+table_name +
-				" where "+DN_symbol+"=? and "+DN_name+"=?;");
+			this._ps_search_symbol=this._db.getConnection().prepareStatement(
+					String.format("SELECT * FROM %s WHERE %s=? AND %s=?;",table_name,DN_symbol,DN_name));
 			this._ps_select_all_asc=this._db.getConnection().prepareStatement(
-					"select * from "+table_name +" ORDER BY "+CoinMasterTable.DN_symbol+" ASC;");
+					String.format("SELECT * FROM %s ORDER BY %s ASC;",table_name,CoinMasterTable.DN_symbol));
+			this._ps_select_all_alias=this._db.getConnection().prepareStatement(
+					String.format("SELECT * FROM %s WHERE %s IS NOT NULL;",table_name,CoinMasterTable.DN_alias_id));
+			this._ps_select_item_id=this._db.getConnection().prepareStatement(
+					String.format("SELECT * FROM %s WHERE %s=?;",table_name,CoinMasterTable.DN_id));
+			this._ps_select_all_spec=this._db.getConnection().prepareStatement(
+				String.format("SELECT * FROM %s WHERE %s=?;",table_name,CoinMasterTable.DN_spec_id));
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -147,7 +159,11 @@ public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 			new Item(null,i_symbol,i_coin_name,i_alias_id,i_start_date,i_spec_id,i_comment),
 			COL_SYMBOL|COL_NAME|COL_ALIAS|COL_START_DATE|COL_SPEC_ID|COL_COMMENT);
 	}
-	
+	public boolean updateAliasId(String i_symbol,String i_coin_name,Integer i_alias_id) throws SdbException
+	{
+		return this.update(
+			i_symbol,i_coin_name,new Item(null,i_symbol,i_coin_name,i_alias_id,null,null,null),COL_ALIAS);
+	}	
 	private final static int COL_ID			=0x80000000;
 	private final static int COL_SYMBOL		=0x40000000;
 	private final static int COL_NAME		=0x20000000;
@@ -379,7 +395,101 @@ public class CoinMasterTable extends BaseTable<CoinMasterTable.Item>
 			throw new SdbException(e);
 		}
 	}
-	
+	/**
+	 * Alias_idを持つ行を選択して返す。
+	 * @return
+	 * @throws SdbException
+	 */
+	public RowIterable<Item> getAliasItems() throws SdbException
+	{
+		try {
+			ResultSet rs=this._ps_select_all_alias.executeQuery();
+			return new RowIterable<Item>(rs,this._table_info);
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
+	}
+	/**
+	 * idからアイテムを得る
+	 * @param i_id
+	 * @throws SdbException 
+	 */
+	public Item getItem(int i_id) throws SdbException
+	{
+		try {
+			this._ps_select_item_id.setInt(1,i_id);
+			ResultSet rs=this._ps_select_item_id.executeQuery();
+			return rs.next()?new Item(rs):null;
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}		
+	}
+	public RowIterable<Item> getItemsBySpec(int i_spec_id) throws SdbException
+	{
+		try {
+			this._ps_select_all_spec.setInt(1,i_spec_id);
+			ResultSet rs=this._ps_select_all_spec.executeQuery();
+			return new RowIterable<Item>(rs,this._table_info);
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
+	}
+	public boolean isExistSpec(int i_spec_id) throws SdbException
+	{
+		try {
+			this._ps_select_all_spec.setInt(1,i_spec_id);
+			ResultSet rs=this._ps_select_all_spec.executeQuery();
+			boolean ret=rs.next();
+			rs.close();
+			return ret;
+		} catch (SQLException e){
+			throw new SdbException(e);
+		}
+	}	
+	/**
+	 * Alias_idからルートIDのアイテムを得る。
+	 * @throws SdbException 
+	 */
+	public Item getRootItemByAlias(int i_alias_id) throws SdbException
+	{
+		int aid=i_alias_id;
+		for(;;){
+			Item item=this.getItem(aid);
+			if(item!=null){
+				//alias_idがあるかチェック
+				if(item.alias_id==null){
+					//Alias_idがNULLの場合
+					return item;
+				}
+				if((int)item.alias_id==(int)item.id){
+					throw new SdbException();
+				}
+				aid=item.alias_id;
+				//alias_idがある場合はさかのぼる
+				continue;
+			}
+			//ID不整合(到達不能)
+			return null;
+		}
+	}
+	/**
+	 * シンボル・名前から、Alias_idを持たないルートIDを返す。
+	 * @param i_symbol
+	 * @param i_name
+	 * @return
+	 * @throws SdbException
+	 */
+	public Item getRootItem(String i_symbol,String i_name) throws SdbException
+	{
+		Item it=this.getItem(i_symbol, i_name);
+		if(it==null){
+			return it;
+		}
+		if(it.alias_id!=null){
+			return this.getRootItemByAlias(it.alias_id);
+		}
+		return it;
+	}	
 /*
 	public RowIterable getAll() throws SdbException
 	{

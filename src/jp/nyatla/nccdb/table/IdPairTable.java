@@ -4,7 +4,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import jp.nyatla.nccdb.table.CoinSpecTable.Item;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
+import jp.nyatla.nyansat.db.basic.RowIterable;
 import jp.nyatla.nyansat.db.basic.SqliteDB;
 import jp.nyatla.nyansat.db.basic.table.BaseTable;
 import jp.nyatla.nyansat.utils.SdbException;
@@ -22,7 +24,7 @@ import jp.nyatla.nyansat.utils.SdbException;
 public class IdPairTable extends BaseTable<IdPairTable.Item>
 {
 
-	private static class IdPairTableInfo extends BasicTableDefinition<Item>
+	protected static class IdPairTableInfo extends BasicTableDefinition<Item>
 	{
 		private String[] _names;
 		public IdPairTableInfo(String i_table_name,String i_id_name1,String i_id_name2)
@@ -41,6 +43,10 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 				this._names[1]+" integer,"+
 				"unique("+this._names[0]+","+this._names[1]+"))";
 		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
+		}		
 	}
 	@Override
 	public void dispose() throws SdbException
@@ -49,6 +55,7 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 			this._ps_insert.close();
 			this._ps_select.close();
 			this._ps_delete.close();
+			this._ps_select_id1.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -57,6 +64,8 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 	private PreparedStatement _ps_delete;
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_select;
+	private PreparedStatement _ps_select_id1;
+	private PreparedStatement _ps_select_distinct_id2;
 	public IdPairTable(SqliteDB i_db,String i_table_name,String i_id1,String i_id2) throws SdbException
 	{
 		super(i_db,new IdPairTableInfo(i_table_name,i_id1,i_id2));
@@ -73,6 +82,8 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 			this._ps_delete=this._db.getConnection().prepareStatement(
 				String.format("delete from %s where %s=? and %s=?;",
 				table_name,d[0],d[1]));
+			this._ps_select_id1=this._db.getConnection().prepareStatement(
+					String.format("select * from %s where %s=?;",table_name,d[0]));
 		}catch (SQLException e){
 			throw new SdbException(e);
 		}
@@ -99,6 +110,7 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 			throw new SdbException(e);
 		}
 	}
+
 	public Item getItem(int i_id1,int i_id2) throws SdbException
 	{
 		try{
@@ -121,12 +133,31 @@ public class IdPairTable extends BaseTable<IdPairTable.Item>
 			throw new SdbException(e);
 		}
 	}
+	public boolean isExistItem(int i_id1,int i_id2) throws SdbException
+	{
+		return this.getItem(i_id1, i_id2)!=null;
+	}
+	
+	protected RowIterable<Item> getItemsById1(Integer i_id1) throws SdbException
+	{
+		try {
+			this._ps_select_id1.setInt(1,i_id1);
+			return new RowIterable<Item>(this._ps_select_id1.executeQuery(),this._table_info);
+		} catch (SQLException e) {
+			throw new SdbException(e);
+		}
+	}
+	
 	public static class Item
 	{
-		public Item(ResultSet rs) throws SQLException
+		public Item(ResultSet rs) throws SdbException
 		{
-			this.id1=rs.getInt(1);
-			this.id2=rs.getInt(2);
+			try{
+				this.id1=rs.getInt(1);
+				this.id2=rs.getInt(2);
+			}catch(SQLException e){
+				throw new SdbException(e);
+			}
 		}
 		public int id1;
 		public int id2;

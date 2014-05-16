@@ -2,6 +2,7 @@ import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 
 import javax.imageio.ImageIO;
 
@@ -45,6 +46,7 @@ public class ImageListImport
 		Logger.log("Starting image search.");
 		CoinMasterTable ctt=null;
 		CoinMasterTable.Item err=null;
+		ArrayList<String> flist=new ArrayList<String>();
 		try{
 			ctt=new CoinMasterTable(db);
 			RowIterable<CoinMasterTable.Item> lctt=ctt.getAll();
@@ -60,6 +62,7 @@ public class ImageListImport
 					Logger.log("[NOFILE]"+it.coin_symbol+" "+it.coin_name);
 					continue;
 				}
+				flist.add(src.getName());
 				//失敗したら
 				BufferedImage img = ImageIO.read(src);
 				int sh=img.getHeight();
@@ -94,6 +97,21 @@ public class ImageListImport
 			if(ctt!=null){
 				ctt.dispose();
 			}
+		}
+		//参照されなかった元ファイルの一覧を作る。
+		Logger.log("No file coins");
+		File sdir = new File(dir_src);
+		File[] files = sdir.listFiles();
+		for(int i=0;i<files.length;i++){
+			for(int i2=0;i2<flist.size();i2++){
+				if(flist.get(i2).equals(files[i].getName())){
+					flist.remove(i2);
+					break;
+				}
+			}
+		}
+		for(String s:flist){
+			Logger.log(s);
 		}
 		Logger.log("done.");
 	}	

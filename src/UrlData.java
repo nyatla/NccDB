@@ -7,5 +7,7 @@ public class UrlData
 		"https://cryptocointalk.com/forum/302-other-algo-cryptocoins/",
 		"https://cryptocointalk.com/forum/888-dying-other-algo-cryptocoins/"		
 	};
+	public static String BC_URL_LIST="https://bitcointalk.org/index.php?board=159";
+
 	public final static String CC_ANNOUNCEMENT_URL="https://cryptocointalk.com/forum/700-cryptocoin-launch-announcements/";
 }

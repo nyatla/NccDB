@@ -20,29 +20,29 @@ public class CoinSourceUrlTable extends BaseTable<CoinSourceUrlTable.Item>
 	public final static int DOMAIN_CCT=1;
 	public final static int DOMAIN_BCT=2;
 	public final static String NAME="cct_sourceurl";
+	public final static String DN_symbol="symbol";
+	public final static String DN_name="name";
+	public final static String DN_url="url";
+	public final static String DN_domain="domain";
 
 	private static class CoinSourceUrlTableInfo extends BasicTableDefinition<Item>
 	{
-		private final static String id_symbol="symbol";
-		private final static String id_name="name";
-		private final static String id_url="url";
-		private final static String id_domain="domain";
 		public CoinSourceUrlTableInfo(String i_table_name)
 		{
 			super(i_table_name);
 		}
 		@Override
 		public String[] getElementNames() {
-			return new String[]{id_symbol,id_name,id_domain,id_url};
+			return new String[]{DN_symbol,DN_name,DN_domain,DN_url};
 		}
 		@Override
 		public String getCreateStr(){
 			return "("+
-				id_symbol+" text,"+
-				id_name+" text,"+
-				id_domain+" integer,"+
-				id_url+" text," +
-				"unique("+id_symbol+","+id_name+"))";
+				DN_symbol+" text,"+
+				DN_name+" text,"+
+				DN_domain+" integer,"+
+				DN_url+" text," +
+				"unique("+DN_symbol+","+DN_name+"))";
 		}
 		public Item createRowItem(ResultSet rs) throws SdbException {
 			return new Item(rs);

@@ -4,6 +4,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import jp.nyatla.nccdb.table.CoinMasterTable.Item;
 import jp.nyatla.nyansat.db.basic.BasicTableDefinition;
 import jp.nyatla.nyansat.db.basic.InsertSqlBuilder;
 import jp.nyatla.nyansat.db.basic.PsUtils;
@@ -53,6 +54,10 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 		public String[] getElementNames() {
 			return this._cols;
 		}
+		@Override
+		public Item createRowItem(ResultSet rs) throws SdbException {
+			return new Item(rs);
+		}		
 	}	
 
 
@@ -64,6 +69,7 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 				this._ps_insert.close();
 			}
 			this._ps_update.close();
+			this._ps_delete_id.close();
 		} catch (SQLException e) {
 			throw new SdbException(e);
 		}
@@ -71,7 +77,9 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 
 	private PreparedStatement _ps_insert;
 	private PreparedStatement _ps_search_id;
-	private PreparedStatement _ps_update;	
+	private PreparedStatement _ps_update;
+	private PreparedStatement _ps_delete_id;
+	
 	public CoinSpecTable(SqliteDB i_db) throws SdbException
 	{
 		this(i_db,NAME);
@@ -81,12 +89,12 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 		super(i_db,new TableDef(i_table_name));
 		try {
 			String table_name=this._table_info.getTableName();
-			this._ps_search_id=this._db.getConnection().prepareStatement("select * from "+table_name +
-					" where "+DN_id+"=?;");
-			this._ps_update=this._db.getConnection().prepareStatement("update "+table_name+" set "
-					+DN_total_coin+"=?,"
-					+DN_premine+"=?,"
-					+DN_id_algorism+"=? where "+DN_id+"=?;");
+			this._ps_search_id=this._db.getConnection().prepareStatement(
+				String.format("SELECT * FROM %s WHERE %s=?;",table_name,DN_id));
+			this._ps_update=this._db.getConnection().prepareStatement(
+				String.format("UPDATE %s SET %s=?,%s=?,%s=? WHERE %s=?;",table_name,DN_total_coin,DN_premine,DN_id_algorism,DN_id));
+			this._ps_delete_id=this._db.getConnection().prepareStatement(
+				String.format("DELETE FROM %s WHERE %s=?;",table_name,DN_id));
 			
 		} catch (SQLException e) {
 			throw new SdbException(e);
@@ -217,6 +225,17 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 			throw new SdbException(e);
 		}
 	}
+	public boolean deleteItem(int i_id) throws SdbException
+	{
+		try{
+			this._ps_delete_id.setInt(1,i_id);
+			int ret=this._ps_delete_id.executeUpdate();
+			return ret>0;
+		}catch(SQLException e){
+			throw new SdbException(e);
+		}		
+	}
+	
 	public static boolean isNullableEqual(Double i_1,Double i_2)
 	{
 		if(i_1!=null){
@@ -244,6 +263,18 @@ public class CoinSpecTable extends BaseTable<CoinSpecTable.Item>
 			this.premine=i_premine;
 			this.id_coin_algorism=i_id_coin_algorism;
 		}
+		public Item(ResultSet i_rs) throws SdbException
+		{
+			try{
+				this.id=i_rs.getInt(DN_id);
+				this.total_coin			=RsUtils.getNullableDouble(i_rs,DN_total_coin);
+				this.premine			=RsUtils.getNullableDouble(i_rs,DN_premine);
+				this.id_coin_algorism	=RsUtils.getNullableInt(i_rs,DN_id_algorism);
+			} catch (SQLException e){
+				throw new SdbException(e);
+			}
+		}
+		
 		public boolean match(Double i_spec_total, Double i_spec_premine,int i_spec_algorism)
 		{
 			return 		isNullableEqual(this.total_coin,i_spec_total)

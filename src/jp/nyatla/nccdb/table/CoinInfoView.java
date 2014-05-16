@@ -13,6 +13,11 @@ import jp.nyatla.nyansat.db.basic.view.BaseView;
 import jp.nyatla.nyansat.utils.CsvWriter;
 import jp.nyatla.nyansat.utils.SdbException;
 
+/**
+ * coin_masterとcoin_specを内部結合したテーブル。
+ * @author nyatla
+ *
+ */
 public class CoinInfoView extends BaseView<CoinInfoView.Item>
 {
 	public final static String NAME="coin_info";	
